@@ -169,6 +169,14 @@ function advanceTurn(room) {
     nextIndex = getNextPlayerIndex(room, nextIndex);
   }
   room.currentPlayerIndex = nextIndex;
+
+  // Always reset pending effects and suit/rank to top card when turn advances
+  // This ensures effects never bleed into future turns
+  const top = room.discardPile[room.discardPile.length - 1];
+  if (!room.pendingEffect && !room.pendingPickup) {
+    room.currentRank = top.rank;
+    room.currentSuit = top.suit;
+  }
 }
 
 function startNextHand(roomData, roomCode) {
@@ -441,6 +449,8 @@ io.on('connection', (socket) => {
     roomData.currentRank = rank;
     roomData.currentSuit = suit;
     roomData.pendingEffect = null;
+    roomData.pendingPickup = 0;
+    roomData.flippedCardEffect = null;
 
     let cardLabel = count === 1 ? rank : `${count}x ${rank}s`;
     let message = `${player.name} played ${cardLabel}`;
@@ -576,6 +586,7 @@ io.on('connection', (socket) => {
       roomData.currentSuit = top.suit;
       roomData.pendingEffect = null;
       roomData.pendingPickup = 0;
+      roomData.flippedCardEffect = null;
     }
 
     if (roomData.pendingPickup > 0) {
