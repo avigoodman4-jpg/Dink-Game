@@ -472,6 +472,7 @@ socket.on('playerLeft', ({ players: playerList, name }) => {
 });
 
 socket.on('roomFull', () => showLobbyError('That room is full! (Max 5 players)'));
+socket.on('gameInProgress', () => showLobbyError('This room\'s game has already started! Try a different room code.'));
 socket.on('nameTaken', () => showLobbyError('That name is already taken in this room!'));
 socket.on('notEnoughPlayers', () => { waitingMsg2.textContent = 'You need at least 2 players to start!'; });
 
