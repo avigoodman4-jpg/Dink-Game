@@ -17,6 +17,7 @@ const rooms = {};
 
 const SUITS = ['hearts', 'diamonds', 'clubs', 'spades'];
 const RANKS = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
+const RANK_VALUES = { '2':2,'3':3,'4':4,'5':5,'6':6,'7':7,'8':8,'9':9,'10':10,'J':11,'Q':12,'K':13,'A':14 };
 
 function buildDeck() {
   const deck = [];
@@ -43,8 +44,17 @@ function dealHand(room) {
     player.hand = deck.splice(0, cardsPerPlayer);
   });
   room.drawPile = deck;
+  room.pendingPickup = 0;
+  room.pendingEffect = null;
+  room.skippedPlayers = new Set();
+  room.direction = 1;
+  room.lastCardDeclared = false;
+  room.flippedCardAceCount = 0;
 
+  // Flip top card
   let topCard = room.drawPile.splice(0, 1)[0];
+
+  // If flipped card is an 8 or 3, redraw
   while (topCard.rank === '8' || topCard.rank === '3') {
     room.drawPile.push(topCard);
     topCard = room.drawPile.splice(0, 1)[0];
@@ -53,10 +63,30 @@ function dealHand(room) {
   room.discardPile = [topCard];
   room.currentSuit = topCard.suit;
   room.currentRank = topCard.rank;
-  room.pendingPickup = 0;
-  room.pendingEffect = null;
-  room.skippedPlayers = new Set();
-  room.direction = 1;
+
+  // Handle flipped card effects
+  room.flippedCardEffect = null;
+  if (topCard.rank === 'A') {
+    // Dealer can choose to accept or reject penalty
+    room.flippedCardEffect = 'ace';
+    room.flippedCardAceCount = 1;
+  } else if (topCard.rank === '4') {
+    room.flippedCardEffect = 'four';
+  } else if (topCard.rank === '2') {
+    room.pendingPickup = 2;
+    room.pendingEffect = 'dink';
+  } else if (topCard.rank === '5') {
+    room.pendingEffect = 'forceFive';
+  } else if (topCard.rank === '6') {
+    room.pendingEffect = 'equalRank';
+  } else if (topCard.rank === '9') {
+    if (room.players.length > 2) room.direction = -1;
+  } else if (topCard.rank === '10') {
+    const colorSwap = { hearts: 'diamonds', diamonds: 'hearts', clubs: 'spades', spades: 'clubs' };
+    room.currentSuit = colorSwap[topCard.suit];
+  } else if (topCard.rank === 'J') {
+    room.flippedCardEffect = 'jack';
+  }
 }
 
 function getNextPlayerIndex(room, fromIndex, steps = 1) {
@@ -99,7 +129,9 @@ function broadcastGameState(room, roomCode, message) {
         pendingPickup: room.pendingPickup,
         pendingEffect: room.pendingEffect,
         message: message,
-        myName: player.name
+        myName: player.name,
+        flippedCardEffect: room.flippedCardEffect,
+        dealerIndex: room.dealerIndex
       });
     }
   });
@@ -125,10 +157,8 @@ function isValidPlay(cards, room) {
   const rank = cards[0].rank;
   const suit = cards[0].suit;
 
-  // 8 is full wild — play on anything
   if (rank === '8') return true;
 
-  // 3 is HALF wild — can only play on matching suit or another 3
   if (rank === '3') {
     return suit === currentSuit || currentRank === '3';
   }
@@ -150,15 +180,14 @@ function advanceTurn(room) {
 
 function startNextHand(roomData, roomCode) {
   const totalHands = 7;
-  const handsLeft = totalHands - roomData.currentHand;
 
-  if (handsLeft === 0) {
+  if (roomData.currentHand >= totalHands) {
     const winner = roomData.players.reduce((a, b) => a.handsWon > b.handsWon ? a : b);
     winner.score++;
     io.to(roomCode).emit('roundOver', {
       players: roomData.players.map(p => ({ name: p.name, handsWon: p.handsWon, score: p.score })),
       winner: winner.name,
-      message: `🏆 ${winner.name} wins the round with ${roomData.handsWon} hands!`
+      message: `🏆 ${winner.name} wins the round!`
     });
     return;
   }
@@ -171,6 +200,16 @@ function startNextHand(roomData, roomCode) {
   dealHand(roomData);
 
   const topCard = roomData.discardPile[roomData.discardPile.length - 1];
+
+  // Handle jack flipped card — goes back to dealer
+  if (roomData.flippedCardEffect === 'jack') {
+    if (roomData.players.length === 2) {
+      roomData.currentPlayerIndex = dealer;
+    } else {
+      roomData.skippedPlayers.add(roomData.currentPlayerIndex);
+    }
+  }
+
   roomData.players.forEach(player => {
     const playerSocket = io.sockets.sockets.get(player.id);
     if (playerSocket) {
@@ -188,9 +227,11 @@ function startNextHand(roomData, roomCode) {
         currentPlayerIndex: roomData.currentPlayerIndex,
         currentHand: roomData.currentHand,
         direction: roomData.direction,
-        pendingPickup: 0,
-        pendingEffect: null,
-        myName: player.name
+        pendingPickup: roomData.pendingPickup,
+        pendingEffect: roomData.pendingEffect,
+        myName: player.name,
+        flippedCardEffect: roomData.flippedCardEffect,
+        dealerIndex: roomData.dealerIndex
       });
     }
   });
@@ -200,14 +241,8 @@ io.on('connection', (socket) => {
   console.log('A player connected:', socket.id);
 
   socket.on('joinRoom', ({ name, room }) => {
-    if (rooms[room] && rooms[room].players.length >= 5) {
-      socket.emit('roomFull');
-      return;
-    }
-    if (rooms[room] && rooms[room].players.find(p => p.name === name)) {
-      socket.emit('nameTaken');
-      return;
-    }
+    if (rooms[room] && rooms[room].players.length >= 5) { socket.emit('roomFull'); return; }
+    if (rooms[room] && rooms[room].players.find(p => p.name === name)) { socket.emit('nameTaken'); return; }
     if (!rooms[room]) {
       rooms[room] = {
         players: [],
@@ -223,7 +258,10 @@ io.on('connection', (socket) => {
         currentRank: null,
         pendingPickup: 0,
         pendingEffect: null,
-        skippedPlayers: new Set()
+        skippedPlayers: new Set(),
+        lastCardDeclared: false,
+        flippedCardEffect: null,
+        flippedCardAceCount: 0
       };
     }
 
@@ -257,27 +295,20 @@ io.on('connection', (socket) => {
     if (!room || !rooms[room]) return;
     if (rooms[room].host !== socket.id) return;
 
-    const RANK_VALUES = { '2':2,'3':3,'4':4,'5':5,'6':6,'7':7,'8':8,'9':9,'10':10,'J':11,'Q':12,'K':13,'A':14 };
-    const SUITS = ['hearts','diamonds','clubs','spades'];
-    const RANKS = ['2','3','4','5','6','7','8','9','10','J','Q','K','A'];
+    const FLIP_RANKS = ['2','3','4','5','6','7','8','9','10','J','Q','K','A'];
+    const FLIP_SUITS = ['hearts','diamonds','clubs','spades'];
 
     function flipCards(playerList) {
-      // Assign each player a random card
       const flippedCards = playerList.map(p => ({
         name: p.name,
-        card: { rank: RANKS[Math.floor(Math.random() * RANKS.length)], suit: SUITS[Math.floor(Math.random() * SUITS.length)] }
+        card: { rank: FLIP_RANKS[Math.floor(Math.random() * FLIP_RANKS.length)], suit: FLIP_SUITS[Math.floor(Math.random() * FLIP_SUITS.length)] }
       }));
-
-      // Find highest value
       const maxValue = Math.max(...flippedCards.map(f => RANK_VALUES[f.card.rank]));
       const winners = flippedCards.filter(f => RANK_VALUES[f.card.rank] === maxValue);
-
       return { flippedCards, winners };
     }
 
     let { flippedCards, winners } = flipCards(rooms[room].players);
-
-    // Keep flipping tied players until one winner
     while (winners.length > 1) {
       const tied = flipCards(winners.map(w => ({ name: w.name })));
       flippedCards = flippedCards.map(f => {
@@ -291,7 +322,6 @@ io.on('connection', (socket) => {
     const dealerIndex = rooms[room].players.findIndex(p => p.name === winnerName);
     rooms[room].dealerIndex = dealerIndex;
 
-    // Send flip results to all players
     io.to(room).emit('cardFlipResult', {
       players: rooms[room].players.map(p => ({ name: p.name, isHost: p.isHost })),
       flippedCards,
@@ -303,10 +333,7 @@ io.on('connection', (socket) => {
   socket.on('startGame', () => {
     const room = socket.roomCode;
     if (!room || !rooms[room]) return;
-    if (rooms[room].players.length < 2) {
-      socket.emit('notEnoughPlayers');
-      return;
-    }
+    if (rooms[room].players.length < 2) { socket.emit('notEnoughPlayers'); return; }
 
     rooms[room].gameStarted = true;
     rooms[room].currentHand = 1;
@@ -316,6 +343,15 @@ io.on('connection', (socket) => {
     rooms[room].currentPlayerIndex = (dealer + 1) % rooms[room].players.length;
 
     dealHand(rooms[room]);
+
+    // Handle jack flipped card effect at game start
+    if (rooms[room].flippedCardEffect === 'jack') {
+      if (rooms[room].players.length === 2) {
+        rooms[room].currentPlayerIndex = dealer;
+      } else {
+        rooms[room].skippedPlayers.add(rooms[room].currentPlayerIndex);
+      }
+    }
 
     const topCard = rooms[room].discardPile[rooms[room].discardPile.length - 1];
     rooms[room].players.forEach(player => {
@@ -335,12 +371,44 @@ io.on('connection', (socket) => {
           currentPlayerIndex: rooms[room].currentPlayerIndex,
           currentHand: rooms[room].currentHand,
           direction: rooms[room].direction,
-          pendingPickup: 0,
-          pendingEffect: null,
-          myName: player.name
+          pendingPickup: rooms[room].pendingPickup,
+          pendingEffect: rooms[room].pendingEffect,
+          myName: player.name,
+          flippedCardEffect: rooms[room].flippedCardEffect,
+          dealerIndex: rooms[room].dealerIndex
         });
       }
     });
+  });
+
+  // Dealer accepts or rejects flipped card penalty (Ace or 4)
+  socket.on('dealerPenaltyChoice', ({ accept }) => {
+    const room = socket.roomCode;
+    if (!room || !rooms[room]) return;
+    const roomData = rooms[room];
+    const dealer = roomData.players[roomData.dealerIndex];
+    if (!dealer || dealer.id !== socket.id) return;
+
+    if (roomData.flippedCardEffect === 'ace') {
+      if (accept) {
+        // Dealer loses their first turn
+        roomData.skippedPlayers.add(roomData.dealerIndex);
+        broadcastGameState(roomData, room, `${dealer.name} accepted the Ace penalty and loses their first turn!`);
+      } else {
+        broadcastGameState(roomData, room, `${dealer.name} rejected the Ace penalty. Play continues normally!`);
+      }
+    } else if (roomData.flippedCardEffect === 'four') {
+      if (accept) {
+        refillDrawPile(roomData);
+        const drawn = roomData.drawPile.splice(0, 1);
+        dealer.hand.push(...drawn);
+        broadcastGameState(roomData, room, `${dealer.name} accepted the 4 penalty and picked up 1 card!`);
+      } else {
+        broadcastGameState(roomData, room, `${dealer.name} rejected the 4 penalty. Play continues normally!`);
+      }
+    }
+
+    roomData.flippedCardEffect = null;
   });
 
   socket.on('playCards', ({ cardIndices }) => {
@@ -366,25 +434,26 @@ io.on('connection', (socket) => {
     player.hand = player.hand.filter((_, i) => !cardIndices.includes(i));
     cards.forEach(c => roomData.discardPile.push(c));
 
-    const rank = cards[0].rank;
-    const suit = cards[0].suit;
+    const lastCard = cards[cards.length - 1];
+    const rank = lastCard.rank;
+    const suit = lastCard.suit;
     const count = cards.length;
 
-    // Update current suit and rank
-    // The LAST card played determines the active suit
-    const lastCard = cards[cards.length - 1];
-    roomData.currentRank = lastCard.rank;
-    roomData.currentSuit = lastCard.suit;
+    roomData.currentRank = rank;
+    roomData.currentSuit = suit;
     roomData.pendingEffect = null;
 
-    let message = `${player.name} played ${count > 1 ? count + 'x ' : ''}${rank}`;
+    // Better message for multiple cards
+    let cardLabel = count === 1 ? rank : `${count}x ${rank}s`;
+    let message = `${player.name} played ${cardLabel}`;
     let extraTurn = false;
 
     if (rank === '2') {
       roomData.pendingPickup = (roomData.pendingPickup || 0) + (count * 2);
       if (roomData.pendingPickup > 8) roomData.pendingPickup = 8;
       roomData.pendingEffect = 'dink';
-      message = `${player.name} played a Dink! Next player picks up ${roomData.pendingPickup}!`;
+      const dinkLabel = roomData.pendingPickup === 2 ? 'a Dink' : `${roomData.pendingPickup / 2} Dinks`;
+      message = `${player.name} played ${dinkLabel}! Next player picks up ${roomData.pendingPickup}!`;
     }
 
     else if (rank === '3') {
@@ -400,19 +469,20 @@ io.on('connection', (socket) => {
         refillDrawPile(roomData);
         const drawn = roomData.drawPile.splice(0, 1);
         player.hand.push(...drawn);
-        message = `${player.name} played an odd number of 4s and picked up 1!`;
+        message = `${player.name} played an odd number of 4s and picked up one card!`;
+      } else {
+        message = `${player.name} played ${count} 4s — no penalty!`;
       }
     }
 
     else if (rank === '5') {
-      // 5s always stack — next player must always play a 5 or pick up
       roomData.pendingEffect = 'forceFive';
       message = `${player.name} played a 5! Next player must play a 5!`;
     }
 
     else if (rank === '6') {
       roomData.pendingEffect = 'equalRank';
-      message = `${player.name} played a 6! Next player must play 2+ cards of same rank!`;
+      message = `${player.name} played a 6! Next player must play 2 or more cards of the same rank!`;
     }
 
     else if (rank === '8') {
@@ -428,14 +498,14 @@ io.on('connection', (socket) => {
         roomData.direction *= -1;
         message = `${player.name} reversed the direction!`;
       } else {
-        message = `${player.name} played a 9 (no effect in 2-player)`;
+        message = `${player.name} played a 9 — no effect in 2-player!`;
       }
     }
 
     else if (rank === '10') {
       const colorSwap = { hearts: 'diamonds', diamonds: 'hearts', clubs: 'spades', spades: 'clubs' };
       roomData.currentSuit = colorSwap[suit];
-      message = `${player.name} played a 10! Suit changed to ${roomData.currentSuit}!`;
+      message = `${player.name} played a 10! Suit swapped to ${roomData.currentSuit}!`;
     }
 
     else if (rank === 'J') {
@@ -453,22 +523,37 @@ io.on('connection', (socket) => {
       if (count % 2 === 0) {
         extraTurn = true;
         message = `${player.name} played ${count} Kings and gets another turn!`;
+      } else {
+        message = `${player.name} played ${count} King${count > 1 ? 's' : ''} — no extra turn!`;
       }
     }
 
     else if (rank === 'A') {
-      if (count % 2 !== 0) {
+      // Count total aces including flipped card
+      const totalAces = count + (roomData.flippedCardAceCount || 0);
+      roomData.flippedCardAceCount = 0;
+      if (totalAces % 2 !== 0) {
         roomData.skippedPlayers.add(playerIndex);
-        message = `${player.name} played an odd Ace and loses their next turn!`;
+        message = `${player.name} played ${count} Ace${count > 1 ? 's' : ''} — loses their next turn!`;
+      } else {
+        message = `${player.name} played ${count} Ace${count > 1 ? 's' : ''} — even number, no effect!`;
       }
     }
 
     if (player.hand.length === 0) {
       player.handsWon++;
+      roomData.lastCardDeclared = false;
       message = `🎉 ${player.name} won hand ${roomData.currentHand}!`;
       broadcastGameState(roomData, room, message);
       setTimeout(() => startNextHand(roomData, room), 2000);
       return;
+    }
+
+    if (player.hand.length === 1) {
+      if (!roomData.lastCardDeclared) {
+        io.to(room).emit('catchable', { playerName: player.name });
+      }
+      roomData.lastCardDeclared = false;
     }
 
     if (!extraTurn) {
@@ -492,7 +577,9 @@ io.on('connection', (socket) => {
       refillDrawPile(roomData);
       const drawn = roomData.drawPile.splice(0, roomData.pendingPickup);
       player.hand.push(...drawn);
-      const msg = `${player.name} picked up ${drawn.length} cards!`;
+      const count = drawn.length;
+      const countWord = count === 1 ? 'one card' : `${count} cards`;
+      const msg = `${player.name} picked up ${countWord}!`;
       roomData.pendingPickup = 0;
       roomData.pendingEffect = null;
       advanceTurn(roomData);
@@ -504,7 +591,7 @@ io.on('connection', (socket) => {
       refillDrawPile(roomData);
       const drawn = roomData.drawPile.splice(0, 1);
       player.hand.push(...drawn);
-      const msg = `${player.name} couldn't respond and picked up 1!`;
+      const msg = `${player.name} couldn't respond and picked up one card!`;
       roomData.pendingEffect = null;
       advanceTurn(roomData);
       broadcastGameState(roomData, room, msg);
@@ -514,7 +601,7 @@ io.on('connection', (socket) => {
     refillDrawPile(roomData);
     const drawn = roomData.drawPile.splice(0, 1);
     player.hand.push(...drawn);
-    const msg = `${player.name} drew a card.`;
+    const msg = `${player.name} picked up one card.`;
     advanceTurn(roomData);
     broadcastGameState(roomData, room, msg);
   });
@@ -531,15 +618,38 @@ io.on('connection', (socket) => {
     broadcastGameState(roomData, room, msg);
   });
 
-socket.on('nextRound', () => {
+  socket.on('declareLastCard', () => {
+    const room = socket.roomCode;
+    if (!room || !rooms[room]) return;
+    const roomData = rooms[room];
+    const playerIndex = roomData.players.findIndex(p => p.id === socket.id);
+    if (playerIndex !== roomData.currentPlayerIndex) return;
+    roomData.lastCardDeclared = true;
+    const player = roomData.players[playerIndex];
+    io.to(room).emit('lastCardDeclared', { playerName: player.name });
+  });
+
+  socket.on('catchLastCard', ({ caughtPlayerName }) => {
+    const room = socket.roomCode;
+    if (!room || !rooms[room]) return;
+    const roomData = rooms[room];
+    const caughtPlayer = roomData.players.find(p => p.name === caughtPlayerName);
+    if (!caughtPlayer) return;
+    refillDrawPile(roomData);
+    const drawn = roomData.drawPile.splice(0, 1);
+    caughtPlayer.hand.push(...drawn);
+    const catcher = roomData.players.find(p => p.id === socket.id);
+    const msg = `⚠️ ${catcher.name} caught ${caughtPlayerName}! They pick up one card!`;
+    io.to(room).emit('caughtLastCard', { caughtPlayerName, msg });
+    broadcastGameState(roomData, room, msg);
+  });
+
+  socket.on('nextRound', () => {
     const room = socket.roomCode;
     if (!room || !rooms[room]) return;
     if (rooms[room].host !== socket.id) return;
 
-    // Reset hands won for all players
     rooms[room].players.forEach(p => { p.handsWon = 0; });
-
-    // Move dealer to next player
     rooms[room].dealerIndex = (rooms[room].dealerIndex + 1) % rooms[room].players.length;
     rooms[room].currentPlayerIndex = (rooms[room].dealerIndex + 1) % rooms[room].players.length;
     rooms[room].currentHand = 1;
@@ -547,6 +657,15 @@ socket.on('nextRound', () => {
     dealHand(rooms[room]);
 
     const topCard = rooms[room].discardPile[rooms[room].discardPile.length - 1];
+
+    if (rooms[room].flippedCardEffect === 'jack') {
+      if (rooms[room].players.length === 2) {
+        rooms[room].currentPlayerIndex = rooms[room].dealerIndex;
+      } else {
+        rooms[room].skippedPlayers.add(rooms[room].currentPlayerIndex);
+      }
+    }
+
     rooms[room].players.forEach(player => {
       const playerSocket = io.sockets.sockets.get(player.id);
       if (playerSocket) {
@@ -564,9 +683,11 @@ socket.on('nextRound', () => {
           currentPlayerIndex: rooms[room].currentPlayerIndex,
           currentHand: rooms[room].currentHand,
           direction: rooms[room].direction,
-          pendingPickup: 0,
-          pendingEffect: null,
-          myName: player.name
+          pendingPickup: rooms[room].pendingPickup,
+          pendingEffect: rooms[room].pendingEffect,
+          myName: player.name,
+          flippedCardEffect: rooms[room].flippedCardEffect,
+          dealerIndex: rooms[room].dealerIndex
         });
       }
     });
@@ -576,10 +697,7 @@ socket.on('nextRound', () => {
     const room = socket.roomCode;
     if (!room || !rooms[room]) return;
     rooms[room].players = rooms[room].players.filter(p => p.id !== socket.id);
-    if (rooms[room].players.length === 0) {
-      delete rooms[room];
-      return;
-    }
+    if (rooms[room].players.length === 0) { delete rooms[room]; return; }
     if (rooms[room].host === socket.id) {
       rooms[room].host = rooms[room].players[0].id;
       rooms[room].players[0].isHost = true;

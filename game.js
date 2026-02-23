@@ -30,9 +30,10 @@ let dealerIndex = 0;
 let direction = 1;
 let pendingEffect = null;
 let selectedCardIndices = [];
+let lastCardDeclared = false;
 
 const SUIT_SYMBOLS = { hearts: '♥', diamonds: '♦', clubs: '♣', spades: '♠' };
-const SUIT_SYMBOLS_FLIP = { hearts: '♥', diamonds: '♦', clubs: '♣', spades: '♠' };
+const RANK_ORDER = ['2','3','4','5','6','7','8','9','10','J','Q','K','A'];
 
 // --- LOBBY ---
 
@@ -50,7 +51,7 @@ function showLobbyError(msg) {
   lobbyError.classList.remove('hidden');
 }
 
-// --- WAITING ROOM STAGE 1 ---
+// --- WAITING ROOM ---
 
 function showWaitingRoom(playerList, host) {
   lobbyScreen.classList.add('hidden');
@@ -77,24 +78,20 @@ function updateWaitingPlayers(playerList) {
 
 pickDealerBtn.addEventListener('click', () => socket.emit('pickDealer'));
 
-// --- CARD FLIP STAGE ---
+// --- CARD FLIP ---
 
 function showCardFlipStage(playerList) {
   document.getElementById('waiting-stage-1').classList.add('hidden');
   document.getElementById('waiting-stage-2').classList.remove('hidden');
-
   const container = document.getElementById('flip-cards-container');
   container.innerHTML = '';
-
   playerList.forEach((p) => {
     const wrapper = document.createElement('div');
     wrapper.classList.add('flip-card-wrapper');
     wrapper.id = `flip-wrapper-${p.name}`;
-
     const label = document.createElement('div');
     label.classList.add('player-label');
     label.textContent = p.name;
-
     const card = document.createElement('div');
     card.classList.add('flip-card');
     card.id = `flip-card-${p.name}`;
@@ -104,7 +101,6 @@ function showCardFlipStage(playerList) {
         <div class="flip-card-back" id="flip-card-back-${p.name}"></div>
       </div>
     `;
-
     wrapper.appendChild(label);
     wrapper.appendChild(card);
     container.appendChild(wrapper);
@@ -114,18 +110,15 @@ function showCardFlipStage(playerList) {
 function revealFlippedCards(flippedCards, winnerName) {
   const flipMsg = document.getElementById('flip-msg');
   flipMsg.textContent = 'Flipping...';
-
   flippedCards.forEach((f, i) => {
     setTimeout(() => {
       const cardEl = document.getElementById(`flip-card-${f.name}`);
       const backEl = document.getElementById(`flip-card-back-${f.name}`);
       if (!cardEl || !backEl) return;
-
       const isRed = f.card.suit === 'hearts' || f.card.suit === 'diamonds';
       backEl.classList.add(isRed ? 'red-card' : 'black-card');
-      backEl.innerHTML = `<span>${f.card.rank}</span><span>${SUIT_SYMBOLS_FLIP[f.card.suit]}</span>`;
+      backEl.innerHTML = `<span>${f.card.rank}</span><span>${SUIT_SYMBOLS[f.card.suit]}</span>`;
       cardEl.classList.add('flipped');
-
       if (i === flippedCards.length - 1) {
         setTimeout(() => {
           const winnerWrapper = document.getElementById(`flip-wrapper-${winnerName}`);
@@ -137,28 +130,19 @@ function revealFlippedCards(flippedCards, winnerName) {
   });
 }
 
-// --- DEALER REVEAL STAGE ---
-
 function showDealerReveal(playerList, winnerIndex) {
   document.getElementById('waiting-stage-2').classList.add('hidden');
   document.getElementById('waiting-stage-3').classList.remove('hidden');
-
   document.getElementById('dealer-name').textContent = playerList[winnerIndex].name;
-
   const list2 = document.getElementById('waiting-players-list-2');
   list2.innerHTML = '';
   playerList.forEach((p, i) => {
     const div = document.createElement('div');
     div.classList.add('waiting-player');
-    if (i === winnerIndex) {
-      div.classList.add('dealer-badge');
-      div.textContent = `🃏 ${p.name} (Dealer)`;
-    } else {
-      div.textContent = p.isHost ? `👑 ${p.name} (Host)` : `🎴 ${p.name}`;
-    }
+    if (i === winnerIndex) { div.classList.add('dealer-badge'); div.textContent = `🃏 ${p.name} (Dealer)`; }
+    else div.textContent = p.isHost ? `👑 ${p.name} (Host)` : `🎴 ${p.name}`;
     list2.appendChild(div);
   });
-
   if (isHost) {
     startBtn.classList.remove('hidden');
     waitingMsg2.textContent = 'Everyone ready? Start the game!';
@@ -169,15 +153,23 @@ function showDealerReveal(playerList, winnerIndex) {
 
 startBtn.addEventListener('click', () => socket.emit('startGame'));
 
+// --- CARD SORTING ---
+
+function sortHand(hand) {
+  return [...hand].sort((a, b) => RANK_ORDER.indexOf(a.rank) - RANK_ORDER.indexOf(b.rank));
+}
+
 // --- GAME RENDERING ---
 
 function updateGameState(data) {
-  myHand = data.hand;
+  myHand = sortHand(data.hand);
   players = data.players;
   currentPlayerIndex = data.currentPlayerIndex;
   direction = data.direction || 1;
   pendingEffect = data.pendingEffect;
+  dealerIndex = data.dealerIndex;
   selectedCardIndices = [];
+  lastCardDeclared = false;
 
   document.getElementById('hand-display').textContent = `Hand: ${data.currentHand} of 7`;
   document.getElementById('score-display').textContent = players.map(p => `${p.name}: ${p.score || 0}pts`).join(' | ');
@@ -187,12 +179,33 @@ function updateGameState(data) {
   renderOtherPlayers(data.players, data.direction);
   updateTurnDisplay(data);
   if (data.message) logMessage(data.message);
+
+  // Handle flipped card dealer penalty
+  if (data.flippedCardEffect === 'ace' || data.flippedCardEffect === 'four') {
+    const isDealer = players[dealerIndex] && players[dealerIndex].name === myName;
+    if (isDealer) {
+      showDealerPenaltyPrompt(data.flippedCardEffect);
+    } else {
+      const dealerName = players[dealerIndex] ? players[dealerIndex].name : 'Dealer';
+      logMessage(`⏳ Waiting for ${dealerName} to decide on the flipped card penalty...`);
+    }
+  }
+}
+
+function showDealerPenaltyPrompt(effect) {
+  const prompt = document.getElementById('dealer-penalty-prompt');
+  const msg = document.getElementById('dealer-penalty-msg');
+  if (effect === 'ace') {
+    msg.textContent = 'The flipped card is an Ace! Do you want to accept the penalty and lose your first turn?';
+  } else if (effect === 'four') {
+    msg.textContent = 'The flipped card is a 4! Do you want to accept the penalty and pick up one card?';
+  }
+  prompt.classList.remove('hidden');
 }
 
 function renderHand() {
   const handDiv = document.getElementById('player-hand');
   handDiv.innerHTML = '';
-
   myHand.forEach((card, index) => {
     const cardDiv = document.createElement('div');
     cardDiv.classList.add('card');
@@ -209,7 +222,6 @@ function renderDiscardPile(topCard, currentSuit) {
   const isRed = topCard.suit === 'hearts' || topCard.suit === 'diamonds';
   discardDiv.innerHTML = `<span>${topCard.rank}</span><span>${SUIT_SYMBOLS[topCard.suit]}</span>`;
   discardDiv.style.color = isRed ? '#cc0000' : '#1a1a1a';
-
   const suitIndicator = document.getElementById('suit-indicator');
   if (currentSuit && currentSuit !== topCard.suit) {
     suitIndicator.textContent = `Active suit: ${SUIT_SYMBOLS[currentSuit]}`;
@@ -289,14 +301,16 @@ function renderOtherPlayers(playerList, dir = 1) {
     playerDiv.classList.add('circle-player');
     const isActive = i === currentPlayerIndex;
     const isMe = p.name === myName;
+    const isDealer = i === dealerIndex;
     if (isActive) playerDiv.classList.add('circle-player-active');
     if (isMe) playerDiv.classList.add('circle-player-me');
     playerDiv.style.left = `${x}px`;
     playerDiv.style.top = `${y}px`;
     playerDiv.innerHTML = `
-      <div class="circle-player-avatar">${p.name.charAt(0).toUpperCase()}</div>
+      <div class="circle-player-avatar">${p.name.charAt(0).toUpperCase()}${isDealer ? '<span class="dealer-indicator">D</span>' : ''}</div>
       <div class="circle-player-name">${isMe ? 'You' : p.name}</div>
-      <div class="circle-player-cards">${p.cardCount} 🃏</div>
+      <div class="circle-player-cards" style="font-size:14px;font-weight:bold;">${p.cardCount} 🃏</div>
+      <div class="circle-player-hands">🏆 ${p.handsWon || 0}</div>
     `;
     otherDiv.appendChild(playerDiv);
   });
@@ -308,15 +322,12 @@ function isMyTurn() {
 
 function onCardClick(index) {
   if (!isMyTurn()) { logMessage("It's not your turn!"); return; }
-
   if (selectedCardIndices.includes(index)) {
     selectedCardIndices = selectedCardIndices.filter(i => i !== index);
   } else {
     selectedCardIndices.push(index);
   }
-
   renderHand();
-
   const playBtn = document.getElementById('play-btn');
   if (selectedCardIndices.length > 0) {
     playBtn.classList.remove('hidden');
@@ -334,6 +345,7 @@ function updateTurnDisplay(data) {
   const turnBanner = document.getElementById('turn-banner');
   const drawBtn = document.getElementById('draw-btn');
   const playBtn = document.getElementById('play-btn');
+  const lastCardBtn = document.getElementById('last-card-btn');
 
   if (isMyTurn()) {
     let bannerText = '🟡 YOUR TURN!';
@@ -344,6 +356,13 @@ function updateTurnDisplay(data) {
     turnBanner.classList.add('my-turn');
     turnBanner.classList.remove('other-turn');
     drawBtn.classList.remove('hidden');
+
+    // Show last card button if I have exactly 2 cards (about to drop to 1)
+    if (myHand.length === 2) {
+      lastCardBtn.classList.remove('hidden');
+    } else {
+      lastCardBtn.classList.add('hidden');
+    }
   } else {
     const currentPlayer = players[currentPlayerIndex];
     turnBanner.textContent = currentPlayer ? `⏳ ${currentPlayer.name}'s turn...` : '';
@@ -351,6 +370,7 @@ function updateTurnDisplay(data) {
     turnBanner.classList.remove('my-turn');
     drawBtn.classList.add('hidden');
     playBtn.classList.add('hidden');
+    lastCardBtn.classList.add('hidden');
   }
 }
 
@@ -368,35 +388,49 @@ document.querySelectorAll('.suit-btn').forEach(btn => {
   });
 });
 
-// --- DRAW CARD ---
+// --- BUTTONS ---
 
 document.getElementById('draw-btn').addEventListener('click', () => {
   if (!isMyTurn()) return;
   socket.emit('drawCard');
 });
 
-// --- PLAY CARDS ---
-
 document.getElementById('play-btn').addEventListener('click', () => {
   if (!isMyTurn() || selectedCardIndices.length === 0) return;
   socket.emit('playCards', { cardIndices: selectedCardIndices });
   selectedCardIndices = [];
+  lastCardDeclared = false;
 });
-
-// --- LAST CARD BUTTON ---
 
 document.getElementById('last-card-btn').addEventListener('click', () => {
   if (!isMyTurn()) return;
+  lastCardDeclared = true;
   socket.emit('declareLastCard');
-  logMessage('You declared Last Card!');
+  document.getElementById('last-card-btn').classList.add('hidden');
+  logMessage('You declared Last Card! Now play your card.');
 });
 
-// --- NEXT ROUND BUTTON ---
+document.getElementById('catch-btn').addEventListener('click', () => {
+  const target = document.getElementById('catch-btn').dataset.target;
+  if (target) {
+    socket.emit('catchLastCard', { caughtPlayerName: target });
+    document.getElementById('catch-btn').classList.add('hidden');
+  }
+});
 
 document.getElementById('next-round-btn').addEventListener('click', () => {
-  if (isHost) {
-    socket.emit('nextRound');
-  }
+  if (isHost) socket.emit('nextRound');
+});
+
+// Dealer penalty prompt buttons
+document.getElementById('dealer-accept-btn').addEventListener('click', () => {
+  socket.emit('dealerPenaltyChoice', { accept: true });
+  document.getElementById('dealer-penalty-prompt').classList.add('hidden');
+});
+
+document.getElementById('dealer-reject-btn').addEventListener('click', () => {
+  socket.emit('dealerPenaltyChoice', { accept: false });
+  document.getElementById('dealer-penalty-prompt').classList.add('hidden');
 });
 
 // --- SOCKET EVENTS ---
@@ -423,9 +457,7 @@ socket.on('cardFlipResult', ({ players: playerList, flippedCards, dealerIndex: d
   setTimeout(() => {
     revealFlippedCards(flippedCards, winnerName);
     const totalDelay = (flippedCards.length * 400) + 2500;
-    setTimeout(() => {
-      showDealerReveal(playerList, di);
-    }, totalDelay);
+    setTimeout(() => showDealerReveal(playerList, di), totalDelay);
   }, 500);
 });
 
@@ -452,7 +484,6 @@ socket.on('roundOver', ({ players: playerList, winner, message }) => {
   const overlayMsg = document.getElementById('round-over-msg');
   const scoresList = document.getElementById('round-scores-list');
   const nextRoundBtn = document.getElementById('next-round-btn');
-
   overlayMsg.textContent = `🏆 ${winner} wins the round!`;
   scoresList.innerHTML = '';
   playerList.forEach(p => {
@@ -461,7 +492,6 @@ socket.on('roundOver', ({ players: playerList, winner, message }) => {
     div.textContent = `${p.name}: ${p.score} point${p.score !== 1 ? 's' : ''} (${p.handsWon} hands won)`;
     scoresList.appendChild(div);
   });
-
   if (isHost) {
     nextRoundBtn.textContent = 'Start Next Round';
     nextRoundBtn.disabled = false;
@@ -471,17 +501,29 @@ socket.on('roundOver', ({ players: playerList, winner, message }) => {
     nextRoundBtn.disabled = true;
     nextRoundBtn.classList.remove('hidden');
   }
-
   overlay.classList.remove('hidden');
 });
 
 socket.on('invalidPlay', (msg) => logMessage(`❌ ${msg}`));
 socket.on('chooseSuit', () => showSuitPicker());
 
+socket.on('catchable', ({ playerName }) => {
+  if (playerName === myName) return;
+  const catchBtn = document.getElementById('catch-btn');
+  catchBtn.dataset.target = playerName;
+  catchBtn.classList.remove('hidden');
+  setTimeout(() => catchBtn.classList.add('hidden'), 3000);
+});
+
+socket.on('caughtLastCard', ({ caughtPlayerName, msg }) => {
+  document.getElementById('catch-btn').classList.add('hidden');
+  logMessage(msg);
+});
+
 socket.on('lastCardDeclared', ({ playerName }) => {
   logMessage(`🔔 ${playerName} said Last Card!`);
 });
 
 socket.on('lastCardPenalty', ({ playerName }) => {
-  logMessage(`⚠️ ${playerName} forgot to say Last Card and picks up 1!`);
+  logMessage(`⚠️ ${playerName} forgot to say Last Card and picks up one card!`);
 });
