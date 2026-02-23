@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Dink</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- LOBBY SCREEN -->
+  <div id="lobby-screen">
+    <h1>🃏 DINK</h1>
+    <p>Created by my Dad — now playable online!</p>
+    <input type="text" id="name-input" placeholder="Enter your name" maxlength="20"/>
+    <input type="text" id="room-input" placeholder="Enter a room code" maxlength="10"/>
+    <button id="join-btn">Join / Create Room</button>
+    <p id="lobby-error" class="error hidden"></p>
+  </div>
+
+  <!-- WAITING ROOM SCREEN -->
+  <div id="waiting-screen" class="hidden">
+    <h1>🃏 DINK</h1>
+    <p id="waiting-room-code"></p>
+    <p class="subtle">Share this room code with your friends!</p>
+
+    <!-- Stage 1: Players lineup -->
+    <div id="waiting-stage-1">
+      <div id="waiting-players-list"></div>
+      <button id="pick-dealer-btn" class="hidden">🃏 Flip Cards for Dealer</button>
+      <p id="waiting-msg"></p>
+    </div>
+
+    <!-- Stage 2: Card flip -->
+    <div id="waiting-stage-2" class="hidden">
+      <p class="subtle">Flipping cards to pick the dealer...</p>
+      <div id="flip-cards-container"></div>
+      <p id="flip-msg"></p>
+    </div>
+
+    <!-- Stage 3: Dealer revealed -->
+    <div id="waiting-stage-3" class="hidden">
+      <div id="dealer-reveal">
+        <p id="dealer-name"></p>
+        <p class="subtle">is the dealer!</p>
+      </div>
+      <div id="waiting-players-list-2"></div>
+      <button id="start-btn" class="hidden">Start Game</button>
+      <p id="waiting-msg-2"></p>
+    </div>
+  </div>
+
+  <!-- GAME SCREEN -->
+  <div id="game-screen" class="hidden">
+
+    <div id="top-bar">
+      <span id="room-display"></span>
+      <span id="hand-display"></span>
+      <span id="score-display"></span>
+    </div>
+
+    <div id="other-players-wrapper">
+      <div id="other-players"></div>
+    </div>
+
+    <div id="center-area">
+      <div id="draw-pile">🂠<br/>Draw</div>
+      <div id="discard-pile-wrapper">
+        <div id="discard-pile">Waiting...</div>
+        <div id="suit-indicator"></div>
+      </div>
+    </div>
+
+    <div id="turn-banner"></div>
+    <div id="game-log"></div>
+
+    <div id="suit-picker" class="hidden">
+      <p>Choose a suit:</p>
+      <div id="suit-buttons">
+        <button class="suit-btn red-suit" data-suit="hearts">♥ Hearts</button>
+        <button class="suit-btn red-suit" data-suit="diamonds">♦ Diamonds</button>
+        <button class="suit-btn" data-suit="clubs">♣ Clubs</button>
+        <button class="suit-btn" data-suit="spades">♠ Spades</button>
+      </div>
+    </div>
+
+    <div id="player-hand"></div>
+
+    <div id="action-bar">
+      <button id="draw-btn" class="hidden">Draw Card</button>
+      <button id="play-btn" class="hidden">Play Selected</button>
+      <button id="last-card-btn" class="hidden">Last Card!</button>
+    </div>
+
+  </div>
+
+  <!-- ROUND OVER OVERLAY -->
+  <div id="round-over-overlay" class="hidden">
+    <div id="round-over-box">
+      <h2 id="round-over-msg"></h2>
+      <div id="round-scores-list"></div>
+      <button id="next-round-btn">Play Another Round</button>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>
