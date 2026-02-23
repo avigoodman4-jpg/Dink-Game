@@ -582,6 +582,8 @@ io.on('connection', (socket) => {
       const msg = `${player.name} picked up ${countWord}!`;
       roomData.pendingPickup = 0;
       roomData.pendingEffect = null;
+      roomData.currentRank = roomData.discardPile[roomData.discardPile.length - 1].rank;
+      roomData.currentSuit = roomData.discardPile[roomData.discardPile.length - 1].suit;
       advanceTurn(roomData);
       broadcastGameState(roomData, room, msg);
       return;
