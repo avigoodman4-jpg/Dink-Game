@@ -50,23 +50,20 @@ function dealHand(room) {
   room.direction = 1;
   room.lastCardDeclared = false;
   room.flippedCardAceCount = 0;
+  room.flippedCardEffect = null;
 
   let topCard = room.drawPile.splice(0, 1)[0];
-  while (topCard.rank === '8' || topCard.rank === '3') {
-    room.drawPile.push(topCard);
-    topCard = room.drawPile.splice(0, 1)[0];
-  }
 
   room.discardPile = [topCard];
   room.currentSuit = topCard.suit;
   room.currentRank = topCard.rank;
 
-  room.flippedCardEffect = null;
-  if (topCard.rank === 'A') {
-    room.flippedCardEffect = 'ace';
-    room.flippedCardAceCount = 1;
-  } else if (topCard.rank === '4') {
-    room.flippedCardEffect = 'four';
+  if (topCard.rank === '8') {
+    // Dealer calls suit — emit chooseSuit to dealer after game starts
+    room.flippedCardEffect = 'eight';
+  } else if (topCard.rank === '3') {
+    // Dealer calls suit — emit chooseSuit to dealer after game starts
+    room.flippedCardEffect = 'three';
   } else if (topCard.rank === '2') {
     room.pendingPickup = 2;
     room.pendingEffect = 'dink';
@@ -74,14 +71,18 @@ function dealHand(room) {
     room.pendingEffect = 'forceFive';
   } else if (topCard.rank === '6') {
     room.pendingEffect = 'equalRank';
-  } else if (topCard.rank === '9') {
-    if (room.players.length > 2) room.direction = -1;
   } else if (topCard.rank === '10') {
     const colorSwap = { hearts: 'diamonds', diamonds: 'hearts', clubs: 'spades', spades: 'clubs' };
     room.currentSuit = colorSwap[topCard.suit];
+  } else if (topCard.rank === 'A') {
+    room.flippedCardEffect = 'ace';
+    room.flippedCardAceCount = 1;
+  } else if (topCard.rank === '4') {
+    room.flippedCardEffect = 'four';
   } else if (topCard.rank === 'J') {
     room.flippedCardEffect = 'jack';
   }
+  // 7, 9, Q, K — no effect, play starts normally
 }
 
 function getNextPlayerIndex(room, fromIndex, steps = 1) {
@@ -200,15 +201,16 @@ function startNextHand(roomData, roomCode) {
 
   dealHand(roomData);
 
+  // Handle flipped jack — skip player left of dealer
   if (roomData.flippedCardEffect === 'jack') {
-    if (roomData.players.length === 2) {
-      roomData.currentPlayerIndex = dealer;
-    } else {
-      roomData.skippedPlayers.add(roomData.currentPlayerIndex);
-    }
+    const skipped = (dealer + 1) % roomData.players.length;
+    roomData.skippedPlayers.add(skipped);
+    roomData.currentPlayerIndex = (dealer + 1) % roomData.players.length;
   }
 
   const topCard = roomData.discardPile[roomData.discardPile.length - 1];
+  const dealerSocket = io.sockets.sockets.get(roomData.players[dealer].id);
+
   roomData.players.forEach(player => {
     const playerSocket = io.sockets.sockets.get(player.id);
     if (playerSocket) {
@@ -234,6 +236,11 @@ function startNextHand(roomData, roomCode) {
       });
     }
   });
+
+  // If flipped card is 8 or 3, ask dealer to pick suit before play begins
+  if (roomData.flippedCardEffect === 'eight' || roomData.flippedCardEffect === 'three') {
+    if (dealerSocket) dealerSocket.emit('chooseSuit');
+  }
 }
 
 io.on('connection', (socket) => {
@@ -347,15 +354,17 @@ io.on('connection', (socket) => {
 
     dealHand(rooms[room]);
 
+    // Handle flipped card effects that affect turn order
     if (rooms[room].flippedCardEffect === 'jack') {
-      if (rooms[room].players.length === 2) {
-        rooms[room].currentPlayerIndex = dealer;
-      } else {
-        rooms[room].skippedPlayers.add(rooms[room].currentPlayerIndex);
-      }
+      // Skip player left of dealer — second player left of dealer goes first
+      const skipped = (dealer + 1) % rooms[room].players.length;
+      rooms[room].skippedPlayers.add(skipped);
+      rooms[room].currentPlayerIndex = (dealer + 1) % rooms[room].players.length;
     }
 
     const topCard = rooms[room].discardPile[rooms[room].discardPile.length - 1];
+    const dealerSocket = io.sockets.sockets.get(rooms[room].players[dealer].id);
+
     rooms[room].players.forEach(player => {
       const playerSocket = io.sockets.sockets.get(player.id);
       if (playerSocket) {
@@ -381,6 +390,11 @@ io.on('connection', (socket) => {
         });
       }
     });
+
+    // If flipped card is 8 or 3, ask dealer to pick suit before play begins
+    if (rooms[room].flippedCardEffect === 'eight' || rooms[room].flippedCardEffect === 'three') {
+      if (dealerSocket) dealerSocket.emit('chooseSuit');
+    }
   });
 
   socket.on('dealerPenaltyChoice', ({ accept, cardIndex }) => {
@@ -683,15 +697,17 @@ io.on('connection', (socket) => {
 
     dealHand(rooms[room]);
 
+    const dealer = rooms[room].dealerIndex;
+
     if (rooms[room].flippedCardEffect === 'jack') {
-      if (rooms[room].players.length === 2) {
-        rooms[room].currentPlayerIndex = rooms[room].dealerIndex;
-      } else {
-        rooms[room].skippedPlayers.add(rooms[room].currentPlayerIndex);
-      }
+      const skipped = (dealer + 1) % rooms[room].players.length;
+      rooms[room].skippedPlayers.add(skipped);
+      rooms[room].currentPlayerIndex = (dealer + 1) % rooms[room].players.length;
     }
 
     const topCard = rooms[room].discardPile[rooms[room].discardPile.length - 1];
+    const dealerSocket = io.sockets.sockets.get(rooms[room].players[dealer].id);
+
     rooms[room].players.forEach(player => {
       const playerSocket = io.sockets.sockets.get(player.id);
       if (playerSocket) {
@@ -717,6 +733,10 @@ io.on('connection', (socket) => {
         });
       }
     });
+
+    if (rooms[room].flippedCardEffect === 'eight' || rooms[room].flippedCardEffect === 'three') {
+      if (dealerSocket) dealerSocket.emit('chooseSuit');
+    }
   });
 
   socket.on('disconnect', () => {

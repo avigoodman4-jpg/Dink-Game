@@ -181,6 +181,7 @@ function updateGameState(data) {
   if (data.message) logMessage(data.message);
 
   // Handle flipped card dealer penalty
+  // Handle flipped card dealer effects
   if (data.flippedCardEffect === 'ace' || data.flippedCardEffect === 'four') {
     const isDealer = players[dealerIndex] && players[dealerIndex].name === myName;
     if (isDealer) {
@@ -189,6 +190,14 @@ function updateGameState(data) {
       const dealerName = players[dealerIndex] ? players[dealerIndex].name : 'Dealer';
       logMessage(`⏳ Waiting for ${dealerName} to decide on the flipped card penalty...`);
     }
+  } else if (data.flippedCardEffect === 'eight' || data.flippedCardEffect === 'three') {
+    const isDealer = players[dealerIndex] && players[dealerIndex].name === myName;
+    if (!isDealer) {
+      const dealerName = players[dealerIndex] ? players[dealerIndex].name : 'Dealer';
+      logMessage(`⏳ Waiting for ${dealerName} to call the suit...`);
+    }
+  } else if (data.flippedCardEffect === 'jack') {
+    logMessage(`🃏 Jack flipped! Player left of dealer is skipped!`);
   }
 }
 
