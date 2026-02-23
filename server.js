@@ -591,6 +591,14 @@ io.on('connection', (socket) => {
 
     const player = roomData.players[playerIndex];
 
+    function resetToTopCard() {
+      const top = roomData.discardPile[roomData.discardPile.length - 1];
+      roomData.currentRank = top.rank;
+      roomData.currentSuit = top.suit;
+      roomData.pendingEffect = null;
+      roomData.pendingPickup = 0;
+    }
+
     if (roomData.pendingPickup > 0) {
       refillDrawPile(roomData);
       const drawn = roomData.drawPile.splice(0, roomData.pendingPickup);
@@ -598,25 +606,43 @@ io.on('connection', (socket) => {
       const count = drawn.length;
       const countWord = count === 1 ? 'one card' : `${count} cards`;
       const msg = `${player.name} picked up ${countWord}!`;
-      roomData.pendingPickup = 0;
-      roomData.pendingEffect = null;
-      roomData.currentRank = roomData.discardPile[roomData.discardPile.length - 1].rank;
-      roomData.currentSuit = roomData.discardPile[roomData.discardPile.length - 1].suit;
+      resetToTopCard();
       advanceTurn(roomData);
       broadcastGameState(roomData, room, msg);
       return;
     }
 
-    if (roomData.pendingEffect === 'forceFive' || roomData.pendingEffect === 'equalRank') {
+    if (roomData.pendingEffect === 'forceFive') {
       refillDrawPile(roomData);
       const drawn = roomData.drawPile.splice(0, 1);
       player.hand.push(...drawn);
-      const msg = `${player.name} couldn't respond and picked up one card!`;
-      roomData.pendingEffect = null;
+      const msg = `${player.name} couldn't play a 5 and picked up one card!`;
+      resetToTopCard();
       advanceTurn(roomData);
       broadcastGameState(roomData, room, msg);
       return;
     }
+
+    if (roomData.pendingEffect === 'equalRank') {
+      refillDrawPile(roomData);
+      const drawn = roomData.drawPile.splice(0, 1);
+      player.hand.push(...drawn);
+      const msg = `${player.name} couldn't match the rank and picked up one card!`;
+      resetToTopCard();
+      advanceTurn(roomData);
+      broadcastGameState(roomData, room, msg);
+      return;
+    }
+
+    // Normal draw
+    refillDrawPile(roomData);
+    const drawn = roomData.drawPile.splice(0, 1);
+    player.hand.push(...drawn);
+    const msg = `${player.name} picked up one card.`;
+    resetToTopCard();
+    advanceTurn(roomData);
+    broadcastGameState(roomData, room, msg);
+  });
 
     refillDrawPile(roomData);
     const drawn = roomData.drawPile.splice(0, 1);
