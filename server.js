@@ -51,10 +51,7 @@ function dealHand(room) {
   room.lastCardDeclared = false;
   room.flippedCardAceCount = 0;
 
-  // Flip top card
   let topCard = room.drawPile.splice(0, 1)[0];
-
-  // If flipped card is an 8 or 3, redraw
   while (topCard.rank === '8' || topCard.rank === '3') {
     room.drawPile.push(topCard);
     topCard = room.drawPile.splice(0, 1)[0];
@@ -64,10 +61,8 @@ function dealHand(room) {
   room.currentSuit = topCard.suit;
   room.currentRank = topCard.rank;
 
-  // Handle flipped card effects
   room.flippedCardEffect = null;
   if (topCard.rank === 'A') {
-    // Dealer can choose to accept or reject penalty
     room.flippedCardEffect = 'ace';
     room.flippedCardAceCount = 1;
   } else if (topCard.rank === '4') {
@@ -169,12 +164,10 @@ function isValidPlay(cards, room) {
 function advanceTurn(room) {
   const total = room.players.length;
   let nextIndex = getNextPlayerIndex(room, room.currentPlayerIndex);
-
   while (room.skippedPlayers.has(nextIndex)) {
     room.skippedPlayers.delete(nextIndex);
     nextIndex = getNextPlayerIndex(room, nextIndex);
   }
-
   room.currentPlayerIndex = nextIndex;
 }
 
@@ -199,9 +192,6 @@ function startNextHand(roomData, roomCode) {
 
   dealHand(roomData);
 
-  const topCard = roomData.discardPile[roomData.discardPile.length - 1];
-
-  // Handle jack flipped card — goes back to dealer
   if (roomData.flippedCardEffect === 'jack') {
     if (roomData.players.length === 2) {
       roomData.currentPlayerIndex = dealer;
@@ -210,6 +200,7 @@ function startNextHand(roomData, roomCode) {
     }
   }
 
+  const topCard = roomData.discardPile[roomData.discardPile.length - 1];
   roomData.players.forEach(player => {
     const playerSocket = io.sockets.sockets.get(player.id);
     if (playerSocket) {
@@ -301,7 +292,10 @@ io.on('connection', (socket) => {
     function flipCards(playerList) {
       const flippedCards = playerList.map(p => ({
         name: p.name,
-        card: { rank: FLIP_RANKS[Math.floor(Math.random() * FLIP_RANKS.length)], suit: FLIP_SUITS[Math.floor(Math.random() * FLIP_SUITS.length)] }
+        card: {
+          rank: FLIP_RANKS[Math.floor(Math.random() * FLIP_RANKS.length)],
+          suit: FLIP_SUITS[Math.floor(Math.random() * FLIP_SUITS.length)]
+        }
       }));
       const maxValue = Math.max(...flippedCards.map(f => RANK_VALUES[f.card.rank]));
       const winners = flippedCards.filter(f => RANK_VALUES[f.card.rank] === maxValue);
@@ -344,7 +338,6 @@ io.on('connection', (socket) => {
 
     dealHand(rooms[room]);
 
-    // Handle jack flipped card effect at game start
     if (rooms[room].flippedCardEffect === 'jack') {
       if (rooms[room].players.length === 2) {
         rooms[room].currentPlayerIndex = dealer;
@@ -381,7 +374,6 @@ io.on('connection', (socket) => {
     });
   });
 
-  // Dealer accepts or rejects flipped card penalty (Ace or 4)
   socket.on('dealerPenaltyChoice', ({ accept, cardIndex }) => {
     const room = socket.roomCode;
     if (!room || !rooms[room]) return;
@@ -400,23 +392,11 @@ io.on('connection', (socket) => {
         broadcastGameState(roomData, room, `${dealer.name} accepted the 4 penalty and picked up one card!`);
       }
     } else {
-      // Rejecting — play the card from hand immediately
       const card = dealer.hand[cardIndex];
-      if (!card) {
-        socket.emit('invalidPlay', 'You do not have a card to reject with!');
-        return;
-      }
+      if (!card) { socket.emit('invalidPlay', 'You do not have a card to reject with!'); return; }
+      if (roomData.flippedCardEffect === 'ace' && card.rank !== 'A') { socket.emit('invalidPlay', 'You can only reject with an Ace!'); return; }
+      if (roomData.flippedCardEffect === 'four' && card.rank !== '4') { socket.emit('invalidPlay', 'You can only reject with a 4!'); return; }
 
-      if (roomData.flippedCardEffect === 'ace' && card.rank !== 'A') {
-        socket.emit('invalidPlay', 'You can only reject with an Ace!');
-        return;
-      }
-      if (roomData.flippedCardEffect === 'four' && card.rank !== '4') {
-        socket.emit('invalidPlay', 'You can only reject with a 4!');
-        return;
-      }
-
-      // Play the card
       dealer.hand = dealer.hand.filter((_, i) => i !== cardIndex);
       roomData.discardPile.push(card);
       roomData.currentRank = card.rank;
@@ -461,7 +441,6 @@ io.on('connection', (socket) => {
     roomData.currentSuit = suit;
     roomData.pendingEffect = null;
 
-    // Better message for multiple cards
     let cardLabel = count === 1 ? rank : `${count}x ${rank}s`;
     let message = `${player.name} played ${cardLabel}`;
     let extraTurn = false;
@@ -547,7 +526,6 @@ io.on('connection', (socket) => {
     }
 
     else if (rank === 'A') {
-      // Count total aces including flipped card
       const totalAces = count + (roomData.flippedCardAceCount || 0);
       roomData.flippedCardAceCount = 0;
       if (totalAces % 2 !== 0) {
@@ -634,20 +612,11 @@ io.on('connection', (socket) => {
       return;
     }
 
-    // Normal draw
     refillDrawPile(roomData);
     const drawn = roomData.drawPile.splice(0, 1);
     player.hand.push(...drawn);
     const msg = `${player.name} picked up one card.`;
     resetToTopCard();
-    advanceTurn(roomData);
-    broadcastGameState(roomData, room, msg);
-  });
-
-    refillDrawPile(roomData);
-    const drawn = roomData.drawPile.splice(0, 1);
-    player.hand.push(...drawn);
-    const msg = `${player.name} picked up one card.`;
     advanceTurn(roomData);
     broadcastGameState(roomData, room, msg);
   });
@@ -702,8 +671,6 @@ io.on('connection', (socket) => {
 
     dealHand(rooms[room]);
 
-    const topCard = rooms[room].discardPile[rooms[room].discardPile.length - 1];
-
     if (rooms[room].flippedCardEffect === 'jack') {
       if (rooms[room].players.length === 2) {
         rooms[room].currentPlayerIndex = rooms[room].dealerIndex;
@@ -712,6 +679,7 @@ io.on('connection', (socket) => {
       }
     }
 
+    const topCard = rooms[room].discardPile[rooms[room].discardPile.length - 1];
     rooms[room].players.forEach(player => {
       const playerSocket = io.sockets.sockets.get(player.id);
       if (playerSocket) {
