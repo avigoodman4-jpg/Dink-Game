@@ -3,31 +3,34 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Dink</title>
+  <title><link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
 
   <!-- LOBBY SCREEN -->
   <div id="lobby-screen">
-    <h1>🃏 DINK</h1>
-    <p>Created by my Dad — now playable online!</p>
-    <input type="text" id="name-input" placeholder="Enter your name" maxlength="20"/>
-    <input type="text" id="room-input" placeholder="Enter a room code" maxlength="10"/>
-    <button id="join-btn">Join / Create Room</button>
+    <div class="dink-logo">DINK</div>
+    <div class="suit-decoration">♠ ♥ ♦ ♣</div>
+    <p class="dink-subtitle">An original card game</p>
+    <div class="panel" style="width:100%;display:flex;flex-direction:column;gap:12px;">
+      <input type="text" id="name-input" placeholder="Enter your name" maxlength="20"/>
+      <input type="text" id="room-input" placeholder="Enter a room code" maxlength="10"/>
+      <button id="join-btn" class="gold-btn">Join / Create Room</button>
+    </div>
     <p id="lobby-error" class="error hidden"></p>
   </div>
 
   <!-- WAITING ROOM SCREEN -->
   <div id="waiting-screen" class="hidden">
-    <h1>🃏 DINK</h1>
+    <div class="dink-logo" style="font-size:clamp(36px,10vw,56px)">DINK</div>
     <p id="waiting-room-code"></p>
     <p class="subtle">Share this room code with your friends!</p>
 
     <!-- Stage 1: Players lineup -->
     <div id="waiting-stage-1">
       <div id="waiting-players-list"></div>
-      <button id="pick-dealer-btn" class="hidden">🃏 Flip Cards for Dealer</button>
+      <button id="pick-dealer-btn" class="gold-btn hidden">🃏 Flip Cards for Dealer</button>
       <p id="waiting-msg"></p>
     </div>
 
@@ -45,7 +48,7 @@
         <p class="subtle">is the dealer!</p>
       </div>
       <div id="waiting-players-list-2"></div>
-      <button id="start-btn" class="hidden">Start Game</button>
+      <button id="start-btn" class="gold-btn hidden">Start Game</button>
       <p id="waiting-msg-2"></p>
     </div>
   </div>
