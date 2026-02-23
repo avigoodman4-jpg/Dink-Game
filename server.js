@@ -232,6 +232,7 @@ io.on('connection', (socket) => {
   console.log('A player connected:', socket.id);
 
   socket.on('joinRoom', ({ name, room }) => {
+    if (rooms[room] && rooms[room].gameStarted) { socket.emit('gameInProgress'); return; }
     if (rooms[room] && rooms[room].players.length >= 5) { socket.emit('roomFull'); return; }
     if (rooms[room] && rooms[room].players.find(p => p.name === name)) { socket.emit('nameTaken'); return; }
     if (!rooms[room]) {
