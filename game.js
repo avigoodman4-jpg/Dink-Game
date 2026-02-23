@@ -195,11 +195,40 @@ function updateGameState(data) {
 function showDealerPenaltyPrompt(effect) {
   const prompt = document.getElementById('dealer-penalty-prompt');
   const msg = document.getElementById('dealer-penalty-msg');
-  if (effect === 'ace') {
-    msg.textContent = 'The flipped card is an Ace! Do you want to accept the penalty and lose your first turn?';
-  } else if (effect === 'four') {
-    msg.textContent = 'The flipped card is a 4! Do you want to accept the penalty and pick up one card?';
+
+  // Find matching cards in hand
+  const targetRank = effect === 'ace' ? 'A' : '4';
+  const matchingCards = myHand
+    .map((card, index) => ({ card, index }))
+    .filter(({ card }) => card.rank === targetRank);
+
+  const effectName = effect === 'ace' ? 'Ace' : '4';
+
+  if (matchingCards.length > 0) {
+    msg.textContent = `The flipped card is a ${effectName}! You have a ${effectName} in your hand. Play it to cancel the penalty, or accept it.`;
+
+    // Build reject buttons for each matching card
+    const rejectContainer = document.getElementById('dealer-reject-container');
+    rejectContainer.innerHTML = '';
+    matchingCards.forEach(({ card, index }) => {
+      const btn = document.createElement('button');
+      btn.classList.add('gold-btn');
+      btn.style.fontSize = '13px';
+      btn.style.padding = '8px 14px';
+      const isRed = card.suit === 'hearts' || card.suit === 'diamonds';
+      btn.innerHTML = `❌ Play ${card.rank}${SUIT_SYMBOLS[card.suit]} to Reject`;
+      btn.style.color = isRed ? '#cc2200' : '#1a1a1a';
+      btn.addEventListener('click', () => {
+        socket.emit('dealerPenaltyChoice', { accept: false, cardIndex: index });
+        prompt.classList.add('hidden');
+      });
+      rejectContainer.appendChild(btn);
+    });
+  } else {
+    msg.textContent = `The flipped card is a ${effectName}! You have no ${effectName} to cancel with — you must accept the penalty.`;
+    document.getElementById('dealer-reject-container').innerHTML = '';
   }
+
   prompt.classList.remove('hidden');
 }
 
@@ -425,11 +454,6 @@ document.getElementById('next-round-btn').addEventListener('click', () => {
 // Dealer penalty prompt buttons
 document.getElementById('dealer-accept-btn').addEventListener('click', () => {
   socket.emit('dealerPenaltyChoice', { accept: true });
-  document.getElementById('dealer-penalty-prompt').classList.add('hidden');
-});
-
-document.getElementById('dealer-reject-btn').addEventListener('click', () => {
-  socket.emit('dealerPenaltyChoice', { accept: false });
   document.getElementById('dealer-penalty-prompt').classList.add('hidden');
 });
 

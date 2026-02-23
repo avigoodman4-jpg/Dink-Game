@@ -382,30 +382,48 @@ io.on('connection', (socket) => {
   });
 
   // Dealer accepts or rejects flipped card penalty (Ace or 4)
-  socket.on('dealerPenaltyChoice', ({ accept }) => {
+  socket.on('dealerPenaltyChoice', ({ accept, cardIndex }) => {
     const room = socket.roomCode;
     if (!room || !rooms[room]) return;
     const roomData = rooms[room];
     const dealer = roomData.players[roomData.dealerIndex];
     if (!dealer || dealer.id !== socket.id) return;
 
-    if (roomData.flippedCardEffect === 'ace') {
-      if (accept) {
-        // Dealer loses their first turn
+    if (accept) {
+      if (roomData.flippedCardEffect === 'ace') {
         roomData.skippedPlayers.add(roomData.dealerIndex);
         broadcastGameState(roomData, room, `${dealer.name} accepted the Ace penalty and loses their first turn!`);
-      } else {
-        broadcastGameState(roomData, room, `${dealer.name} rejected the Ace penalty. Play continues normally!`);
-      }
-    } else if (roomData.flippedCardEffect === 'four') {
-      if (accept) {
+      } else if (roomData.flippedCardEffect === 'four') {
         refillDrawPile(roomData);
         const drawn = roomData.drawPile.splice(0, 1);
         dealer.hand.push(...drawn);
-        broadcastGameState(roomData, room, `${dealer.name} accepted the 4 penalty and picked up 1 card!`);
-      } else {
-        broadcastGameState(roomData, room, `${dealer.name} rejected the 4 penalty. Play continues normally!`);
+        broadcastGameState(roomData, room, `${dealer.name} accepted the 4 penalty and picked up one card!`);
       }
+    } else {
+      // Rejecting — play the card from hand immediately
+      const card = dealer.hand[cardIndex];
+      if (!card) {
+        socket.emit('invalidPlay', 'You do not have a card to reject with!');
+        return;
+      }
+
+      if (roomData.flippedCardEffect === 'ace' && card.rank !== 'A') {
+        socket.emit('invalidPlay', 'You can only reject with an Ace!');
+        return;
+      }
+      if (roomData.flippedCardEffect === 'four' && card.rank !== '4') {
+        socket.emit('invalidPlay', 'You can only reject with a 4!');
+        return;
+      }
+
+      // Play the card
+      dealer.hand = dealer.hand.filter((_, i) => i !== cardIndex);
+      roomData.discardPile.push(card);
+      roomData.currentRank = card.rank;
+      roomData.currentSuit = card.suit;
+
+      const effectName = roomData.flippedCardEffect === 'ace' ? 'Ace' : '4';
+      broadcastGameState(roomData, room, `${dealer.name} rejected the ${effectName} penalty by playing their own ${effectName}! Even number — no effect!`);
     }
 
     roomData.flippedCardEffect = null;
