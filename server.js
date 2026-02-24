@@ -403,7 +403,9 @@ io.on('connection', (socket) => {
     if (accept) {
       if (r.flippedCardEffect === 'ace') {
         r.skippedPlayers.add(r.dealerIndex);
+        r.flippedAceCount = 0;
         r.flippedCardEffect = null;
+        r.waitingForDealerPenalty = false;
         broadcast(r, room, `${dealer.name} accepted the Ace penalty — loses first turn!`);
       } else if (r.flippedCardEffect === 'four') {
         refillDraw(r);
@@ -556,9 +558,8 @@ io.on('connection', (socket) => {
     }
 
     else if (rank === 'A') {
-      const totalAces = count + (r.flippedAceCount || 0);
       r.flippedAceCount = 0;
-      if (totalAces % 2 !== 0) {
+      if (count % 2 !== 0) {
         r.skippedPlayers.add(playerIndex);
         message = `${player.name} played ${count} Ace${count > 1 ? 's' : ''} — loses next turn!`;
       } else {
