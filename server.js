@@ -131,7 +131,6 @@ function clearEffects(room) {
   room.pendingPickup = 0;
   room.flippedCardEffect = null;
   room.waitingForDealerSuit = false;
-  room.waitingForDealerPenalty = false;
 }
 
 // ─── BROADCAST ───────────────────────────────────────────────────────────────
@@ -175,7 +174,6 @@ function isValidPlay(cards, room) {
 
   const { currentSuit, currentRank, pendingEffect } = room;
 
-  // Pending effects: ONLY specific responses allowed, nothing else
   if (pendingEffect === 'dink')
     return cards.every(c => c.rank === '2');
   if (pendingEffect === 'forceFive')
@@ -183,7 +181,6 @@ function isValidPlay(cards, room) {
   if (pendingEffect === 'equalRank')
     return cards.length >= 2 && cards.every(c => c.rank === cards[0].rank);
 
-  // NO pending effect — completely normal play off top card
   if (!cards.every(c => c.rank === cards[0].rank)) return false;
 
   const rank = cards[0].rank;
@@ -597,7 +594,7 @@ io.on('connection', (socket) => {
     if (!room || !rooms[room]) return;
     const r = rooms[room];
 
-    if (r.waitingForDealerSuit) return;
+    if (r.waitingForDealerSuit || r.waitingForDealerPenalty) return;
 
     const playerIndex = r.players.findIndex(p => p.id === socket.id);
     if (playerIndex !== r.currentPlayerIndex) return;
@@ -605,50 +602,38 @@ io.on('connection', (socket) => {
 
     refillDraw(r);
 
+    // Figure out how many cards to draw and what message to show
+    let drawCount = 1;
+    let msg = `${player.name} picked up one card.`;
+
     if (r.pendingPickup > 0) {
-      const amount = r.pendingPickup;
-      // Clear effect BEFORE drawing
-      r.pendingEffect = null;
-      r.pendingPickup = 0;
-      r.flippedCardEffect = null;
-      refillDraw(r);
-      const drawn = r.drawPile.splice(0, amount);
-      player.hand.push(...drawn);
-      const top = topCard(r);
-      r.currentSuit = top.suit;
-      r.currentRank = top.rank;
-      const msg = `${player.name} picked up ${drawn.length} card${drawn.length > 1 ? 's' : ''}!`;
-      advanceTurn(r);
-      broadcast(r, room, msg);
-      return;
+      drawCount = r.pendingPickup;
+      msg = `${player.name} picked up ${drawCount} card${drawCount > 1 ? 's' : ''}!`;
+    } else if (r.pendingEffect === 'forceFive') {
+      msg = `${player.name} couldn't play a 5 — picked up one card!`;
+    } else if (r.pendingEffect === 'equalRank') {
+      msg = `${player.name} couldn't match the rank — picked up one card!`;
+    } else if (r.pendingEffect === 'dink') {
+      drawCount = r.pendingPickup || 2;
+      msg = `${player.name} picked up ${drawCount} card${drawCount > 1 ? 's' : ''}!`;
     }
 
-    if (r.pendingEffect === 'forceFive' || r.pendingEffect === 'equalRank') {
-      const effectMsg = r.pendingEffect === 'forceFive'
-        ? `${player.name} couldn't play a 5 — picked up one card!`
-        : `${player.name} couldn't match the rank — picked up one card!`;
-      // Clear effect BEFORE drawing so clearEffects doesn't re-read a special card rank
-      r.pendingEffect = null;
-      r.pendingPickup = 0;
-      r.flippedCardEffect = null;
-      refillDraw(r);
-      const drawn = r.drawPile.splice(0, 1);
-      player.hand.push(...drawn);
-      // Now reset suit/rank to top of discard (the 5 or 6 that caused this)
-      // but with pendingEffect already null so it won't block play
-      const top = topCard(r);
-      r.currentSuit = top.suit;
-      r.currentRank = top.rank;
-      advanceTurn(r);
-      broadcast(r, room, effectMsg);
-      return;
-    }
-
-    // Normal draw
-    const drawn = r.drawPile.splice(0, 1);
+    // Draw the cards
+    const drawn = r.drawPile.splice(0, drawCount);
     player.hand.push(...drawn);
-    const msg = `${player.name} picked up one card.`;
-    clearEffects(r);
+
+    // ALWAYS fully wipe ALL effects after any draw — no exceptions
+    r.pendingEffect = null;
+    r.pendingPickup = 0;
+    r.flippedCardEffect = null;
+    r.waitingForDealerSuit = false;
+    r.waitingForDealerPenalty = false;
+
+    // Reset suit and rank to actual top of discard pile
+    const top = topCard(r);
+    r.currentSuit = top.suit;
+    r.currentRank = top.rank;
+
     advanceTurn(r);
     broadcast(r, room, msg);
   });
