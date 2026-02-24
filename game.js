@@ -184,28 +184,18 @@ function updateGameState(data) {
   }
 }
 
-function sortHand(hand) {
-  return [...hand].sort((a, b) => RANK_ORDER.indexOf(a.rank) - RANK_ORDER.indexOf(b.rank));
-}
-
 // ─── RENDER ───────────────────────────────────────────────────────────────────
 
 function renderHand() {
   const handDiv = document.getElementById('player-hand');
   handDiv.innerHTML = '';
-
-  // Sort a copy for display, keeping track of original indices
-  const sorted = myHand
-    .map((card, originalIndex) => ({ card, originalIndex }))
-    .sort((a, b) => RANK_ORDER.indexOf(a.card.rank) - RANK_ORDER.indexOf(b.card.rank));
-
-  sorted.forEach(({ card, originalIndex }) => {
+  myHand.forEach((card, index) => {
     const div = document.createElement('div');
     div.classList.add('card');
     if (card.suit === 'hearts' || card.suit === 'diamonds') div.classList.add('red');
-    if (selectedCardIndices.includes(originalIndex)) div.classList.add('selected');
+    if (selectedCardIndices.includes(index)) div.classList.add('selected');
     div.innerHTML = `<span>${card.rank}</span><span>${SUIT_SYMBOLS[card.suit]}</span>`;
-    div.addEventListener('click', () => onCardClick(originalIndex));
+    div.addEventListener('click', () => onCardClick(index));
     handDiv.appendChild(div);
   });
 }
