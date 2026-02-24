@@ -398,8 +398,8 @@ io.on('connection', (socket) => {
     if (!player) return;
     r.pendingEffect = null;
     r.pendingPickup = 0;
+    r.waitingForSuitChoice = false;
     advanceTurn(r);
-    // Set suit AFTER advancing so nothing overwrites it
     r.currentSuit = suit;
     broadcast(r, room, `${player.name} chose ${suit}!`);
   });
@@ -495,6 +495,7 @@ io.on('connection', (socket) => {
     }
 
     else if (rank === '3') {
+      r.waitingForSuitChoice = true;
       message = `${player.name} played a 3! Choosing suit...`;
       broadcast(r, room, message);
       socket.emit('chooseSuit');
@@ -523,6 +524,7 @@ io.on('connection', (socket) => {
     }
 
     else if (rank === '8') {
+      r.waitingForSuitChoice = true;
       message = `${player.name} played a wild 8! Choosing suit...`;
       broadcast(r, room, message);
       socket.emit('chooseSuit');
@@ -602,7 +604,7 @@ io.on('connection', (socket) => {
     if (!room || !rooms[room]) return;
     const r = rooms[room];
 
-    if (r.waitingForDealerSuit || r.waitingForDealerPenalty) return;
+    if (r.waitingForDealerSuit || r.waitingForDealerPenalty || r.waitingForSuitChoice) return;
 
     const playerIndex = r.players.findIndex(p => p.id === socket.id);
     if (playerIndex !== r.currentPlayerIndex) return;
@@ -629,16 +631,25 @@ io.on('connection', (socket) => {
     sortHand(player.hand);
 
     // ALWAYS wipe ALL effects after any draw — no exceptions
+    // Wipe ALL effects after any draw — no exceptions
     r.pendingEffect = null;
     r.pendingPickup = 0;
     r.flippedCardEffect = null;
     r.waitingForDealerSuit = false;
     r.waitingForDealerPenalty = false;
+    r.waitingForSuitChoice = false;
 
-    // Reset suit and rank to top of discard pile
+    // Reset rank to top card but preserve currentSuit
+    // because a played 8 or 3 may have changed it to a chosen suit
+    // that must survive through other players drawing
     const top = topCard(r);
-    r.currentSuit = top.suit;
     r.currentRank = top.rank;
+    // Only reset suit if no explicit suit was chosen — i.e. top card suit matches currentSuit
+    // If they differ, currentSuit was deliberately set by a suit choice and must be kept
+    if (r.currentSuit === top.suit) {
+      r.currentSuit = top.suit; // no-op but explicit
+    }
+    // else: keep r.currentSuit as-is (it was set by 8 or 3 choice)
 
     advanceTurn(r);
     broadcast(r, room, msg);
