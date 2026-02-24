@@ -1,28 +1,10 @@
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
-
-/* ---- FONTS & BASE ---- */
+* { margin: 0; padding: 0; box-sizing: border-box; }
 
 body {
   background-color: #0d3320;
   background-image:
-    repeating-linear-gradient(
-      45deg,
-      rgba(255,255,255,0.015) 0px,
-      rgba(255,255,255,0.015) 1px,
-      transparent 1px,
-      transparent 12px
-    ),
-    repeating-linear-gradient(
-      -45deg,
-      rgba(255,255,255,0.015) 0px,
-      rgba(255,255,255,0.015) 1px,
-      transparent 1px,
-      transparent 12px
-    );
+    repeating-linear-gradient(45deg, rgba(255,255,255,0.015) 0px, rgba(255,255,255,0.015) 1px, transparent 1px, transparent 12px),
+    repeating-linear-gradient(-45deg, rgba(255,255,255,0.015) 0px, rgba(255,255,255,0.015) 1px, transparent 1px, transparent 12px);
   color: #f0e6cc;
   font-family: 'Inter', Arial, sans-serif;
   display: flex;
@@ -32,7 +14,9 @@ body {
   min-height: -webkit-fill-available;
 }
 
-/* ---- LOGO ---- */
+.hidden { display: none !important; }
+
+/* ── LOGO ── */
 
 .dink-logo {
   font-family: 'Playfair Display', serif;
@@ -42,9 +26,11 @@ body {
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-  text-shadow: none;
   filter: drop-shadow(0 2px 8px rgba(240,192,64,0.4));
-  margin-bottom: 4px;
+}
+
+.small-logo {
+  font-size: clamp(36px, 10vw, 56px);
 }
 
 .dink-subtitle {
@@ -55,29 +41,55 @@ body {
   margin-bottom: 8px;
 }
 
-/* ---- CARD SUITS DECORATION ---- */
-
 .suit-decoration {
   font-size: 18px;
   color: rgba(240,192,64,0.4);
   letter-spacing: 12px;
-  margin-bottom: 16px;
+  margin-bottom: 8px;
 }
 
-/* ---- SHARED PANEL STYLE ---- */
+.subtle {
+  font-size: 12px;
+  opacity: 0.5;
+  letter-spacing: 1px;
+}
+
+/* ── PANEL ── */
 
 .panel {
   background: linear-gradient(160deg, #1a5c38 0%, #0f3d24 100%);
   border: 1px solid rgba(240,192,64,0.3);
   border-radius: 16px;
-  box-shadow:
-    0 0 0 1px rgba(0,0,0,0.4),
-    0 8px 32px rgba(0,0,0,0.5),
-    inset 0 1px 0 rgba(255,255,255,0.05);
-  padding: 32px;
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.4), 0 8px 32px rgba(0,0,0,0.5);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
 }
 
-/* ---- LOBBY ---- */
+/* ── GOLD BUTTON ── */
+
+.gold-btn {
+  padding: 14px 40px;
+  background: linear-gradient(135deg, #c8960c 0%, #f0c040 50%, #c8960c 100%);
+  color: #1a1a1a;
+  border: none;
+  border-radius: 10px;
+  font-size: 16px;
+  font-weight: 700;
+  font-family: 'Inter', sans-serif;
+  cursor: pointer;
+  width: 100%;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  box-shadow: 0 4px 16px rgba(240,192,64,0.3);
+  transition: all 0.2s;
+}
+.gold-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(240,192,64,0.5); }
+.gold-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+/* ── LOBBY ── */
 
 #lobby-screen {
   text-align: center;
@@ -104,53 +116,12 @@ body {
   outline: none;
   transition: border 0.2s;
 }
+#lobby-screen input:focus { border-color: rgba(240,192,64,0.7); }
+#lobby-screen input::placeholder { color: rgba(240,220,160,0.4); }
 
-#lobby-screen input:focus {
-  border-color: rgba(240,192,64,0.7);
-}
+.error { color: #ff8080; font-size: 13px; }
 
-#lobby-screen input::placeholder {
-  color: rgba(240,220,160,0.4);
-}
-
-.gold-btn {
-  padding: 14px 40px;
-  background: linear-gradient(135deg, #c8960c 0%, #f0c040 50%, #c8960c 100%);
-  color: #1a1a1a;
-  border: none;
-  border-radius: 10px;
-  font-size: 16px;
-  font-weight: 700;
-  font-family: 'Inter', sans-serif;
-  cursor: pointer;
-  width: 100%;
-  letter-spacing: 1px;
-  text-transform: uppercase;
-  box-shadow: 0 4px 16px rgba(240,192,64,0.3);
-  transition: all 0.2s;
-}
-
-.gold-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(240,192,64,0.5);
-}
-
-.gold-btn:active {
-  transform: translateY(0);
-}
-
-.gold-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  transform: none;
-}
-
-.error {
-  color: #ff8080;
-  font-size: 13px;
-}
-
-/* ---- WAITING ROOM ---- */
+/* ── WAITING ROOM ── */
 
 #waiting-screen {
   text-align: center;
@@ -165,7 +136,7 @@ body {
 
 #waiting-room-code {
   font-family: 'Playfair Display', serif;
-  font-size: clamp(20px, 5vw, 26px);
+  font-size: clamp(18px, 5vw, 24px);
   font-weight: 700;
   background: rgba(0,0,0,0.3);
   border: 1px solid rgba(240,192,64,0.3);
@@ -175,13 +146,7 @@ body {
   color: #f0c040;
 }
 
-.subtle {
-  font-size: 12px;
-  opacity: 0.5;
-  letter-spacing: 1px;
-}
-
-#waiting-players-list {
+#waiting-players-list, #waiting-players-list-2 {
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -194,16 +159,18 @@ body {
   padding: 12px 20px;
   border-radius: 10px;
   font-size: 16px;
-  color: #f0e6cc;
 }
 
-#waiting-msg {
-  font-size: 13px;
-  opacity: 0.6;
-  letter-spacing: 0.5px;
+.dealer-badge {
+  background: rgba(240,192,64,0.2) !important;
+  border-color: rgba(240,192,64,0.5) !important;
+  color: #f0c040 !important;
+  font-weight: 700;
 }
 
-/* ---- CARD FLIP ---- */
+#waiting-msg, #waiting-msg-2 { font-size: 13px; opacity: 0.6; }
+
+/* ── CARD FLIP ── */
 
 #waiting-stage-2 {
   display: flex;
@@ -240,27 +207,21 @@ body {
   width: 72px;
   height: 104px;
   border-radius: 10px;
-  cursor: default;
   perspective: 600px;
 }
 
 .flip-card-inner {
-  width: 100%;
-  height: 100%;
+  width: 100%; height: 100%;
   position: relative;
   transform-style: preserve-3d;
   transition: transform 0.6s ease;
 }
 
-.flip-card.flipped .flip-card-inner {
-  transform: rotateY(180deg);
-}
+.flip-card.flipped .flip-card-inner { transform: rotateY(180deg); }
 
-.flip-card-front,
-.flip-card-back {
+.flip-card-front, .flip-card-back {
   position: absolute;
-  width: 100%;
-  height: 100%;
+  width: 100%; height: 100%;
   border-radius: 10px;
   backface-visibility: hidden;
   display: flex;
@@ -287,23 +248,15 @@ body {
 }
 
 .flip-card-back.red-card { color: #cc2200; }
-.flip-card-back.black-card { color: #111111; }
-
+.flip-card-back.black-card { color: #111; }
 .flip-card-wrapper.winner-card .flip-card-back {
-  background: linear-gradient(135deg, #fde98a 0%, #f0c040 100%);
+  background: linear-gradient(135deg, #fde98a, #f0c040);
   box-shadow: 0 0 20px rgba(240,192,64,0.8);
 }
 
-#flip-msg {
-  font-size: 17px;
-  font-weight: 600;
-  min-height: 28px;
-  text-align: center;
-  padding: 0 10px;
-  color: #f0c040;
-}
+#flip-msg { font-size: 17px; font-weight: 600; text-align: center; padding: 0 10px; color: #f0c040; min-height: 28px; }
 
-/* ---- DEALER REVEAL ---- */
+/* ── DEALER REVEAL ── */
 
 #waiting-stage-3 {
   display: flex;
@@ -324,25 +277,11 @@ body {
 
 #dealer-name {
   font-family: 'Playfair Display', serif;
-  font-size: clamp(24px, 6vw, 34px);
+  font-size: clamp(22px, 6vw, 32px);
   color: #f0c040;
 }
 
-#waiting-players-list-2 {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  width: 100%;
-}
-
-.dealer-badge {
-  background: rgba(240,192,64,0.2) !important;
-  border-color: rgba(240,192,64,0.5) !important;
-  color: #f0c040 !important;
-  font-weight: 700;
-}
-
-/* ---- GAME SCREEN ---- */
+/* ── GAME SCREEN ── */
 
 #game-screen {
   width: 100vw;
@@ -353,10 +292,9 @@ body {
   align-items: center;
   padding: 8px;
   gap: 6px;
-  overflow: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
-
-/* ---- TOP BAR ---- */
 
 #top-bar {
   width: 100%;
@@ -372,7 +310,7 @@ body {
   border: 1px solid rgba(240,192,64,0.1);
 }
 
-/* ---- PLAYER CIRCLE ---- */
+/* ── PLAYER CIRCLE ── */
 
 #other-players-wrapper {
   display: flex;
@@ -416,11 +354,10 @@ body {
   font-weight: 600;
   white-space: nowrap;
   color: rgba(240,220,160,0.9);
-  letter-spacing: 0.5px;
 }
 
 .circle-player-cards {
-  font-size: clamp(11px, 3vw, 14px);
+  font-size: clamp(12px, 3vw, 14px);
   font-weight: 700;
   color: #f0e6cc;
 }
@@ -428,15 +365,12 @@ body {
 .circle-player-hands {
   font-size: clamp(9px, 2vw, 11px);
   color: #f0c040;
-  opacity: 0.9;
 }
 
 .circle-player-active .circle-player-avatar {
   background: rgba(240,192,64,0.3);
   border: 2px solid #f0c040;
-  box-shadow:
-    0 0 12px rgba(240,192,64,0.6),
-    0 0 24px rgba(240,192,64,0.2);
+  box-shadow: 0 0 12px rgba(240,192,64,0.6), 0 0 24px rgba(240,192,64,0.2);
   animation: pulse 1s infinite alternate;
 }
 
@@ -466,7 +400,12 @@ body {
   font-weight: 700;
 }
 
-/* ---- CENTER AREA ---- */
+@keyframes pulse {
+  from { transform: scale(1); box-shadow: 0 0 12px rgba(240,192,64,0.4); }
+  to   { transform: scale(1.05); box-shadow: 0 0 20px rgba(240,192,64,0.7); }
+}
+
+/* ── CENTER ── */
 
 #center-area {
   display: flex;
@@ -491,13 +430,9 @@ body {
   flex-direction: column;
   gap: 4px;
   transition: all 0.2s;
-  letter-spacing: 0.5px;
 }
 
-#draw-pile:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(0,0,0,0.5);
-}
+#draw-pile:hover { transform: translateY(-2px); }
 
 #discard-pile-wrapper {
   display: flex;
@@ -518,9 +453,7 @@ body {
   justify-content: center;
   font-size: clamp(16px, 5vw, 24px);
   font-weight: 700;
-  box-shadow:
-    0 4px 16px rgba(0,0,0,0.4),
-    0 0 0 3px rgba(240,192,64,0.3);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.4), 0 0 0 3px rgba(240,192,64,0.3);
   gap: 4px;
 }
 
@@ -529,10 +462,9 @@ body {
   font-weight: 700;
   text-align: center;
   min-height: 22px;
-  letter-spacing: 1px;
 }
 
-/* ---- TURN BANNER ---- */
+/* ── TURN BANNER ── */
 
 #turn-banner {
   font-size: clamp(13px, 3.5vw, 18px);
@@ -540,10 +472,10 @@ body {
   padding: 8px 20px;
   border-radius: 10px;
   text-align: center;
-  letter-spacing: 1px;
   width: 100%;
   max-width: 500px;
   text-transform: uppercase;
+  letter-spacing: 1px;
 }
 
 #turn-banner.my-turn {
@@ -559,12 +491,7 @@ body {
   color: rgba(240,220,160,0.6);
 }
 
-@keyframes pulse {
-  from { transform: scale(1); box-shadow: 0 4px 16px rgba(240,192,64,0.3); }
-  to { transform: scale(1.02); box-shadow: 0 6px 24px rgba(240,192,64,0.5); }
-}
-
-/* ---- GAME LOG ---- */
+/* ── GAME LOG ── */
 
 #game-log {
   font-size: clamp(11px, 2.8vw, 13px);
@@ -574,10 +501,9 @@ body {
   width: 100%;
   padding: 0 10px;
   min-height: 18px;
-  letter-spacing: 0.3px;
 }
 
-/* ---- SUIT PICKER ---- */
+/* ── SUIT PICKER ── */
 
 #suit-picker {
   background: linear-gradient(160deg, #1a5c38 0%, #0f3d24 100%);
@@ -590,20 +516,9 @@ body {
   box-shadow: 0 8px 24px rgba(0,0,0,0.4);
 }
 
-#suit-picker p {
-  margin-bottom: 10px;
-  font-size: 14px;
-  color: rgba(240,220,160,0.8);
-  letter-spacing: 1px;
-  text-transform: uppercase;
-}
+#suit-picker p { margin-bottom: 10px; font-size: 14px; color: rgba(240,220,160,0.8); text-transform: uppercase; letter-spacing: 1px; }
 
-#suit-buttons {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  justify-content: center;
-}
+#suit-buttons { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
 
 .suit-btn {
   padding: 10px 16px;
@@ -617,11 +532,35 @@ body {
   transition: transform 0.15s;
   box-shadow: 0 2px 8px rgba(0,0,0,0.2);
 }
-
 .suit-btn.red-suit { color: #cc2200; }
 .suit-btn:hover { transform: scale(1.08) translateY(-2px); }
 
-/* ---- PLAYER HAND ---- */
+/* ── DEALER PENALTY PROMPT ── */
+
+#dealer-penalty-prompt {
+  background: linear-gradient(160deg, #1a5c38 0%, #0f3d24 100%);
+  border: 1px solid rgba(240,192,64,0.3);
+  border-radius: 12px;
+  padding: 16px 20px;
+  text-align: center;
+  width: 100%;
+  max-width: 420px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+}
+
+#dealer-penalty-msg { font-size: 14px; margin-bottom: 12px; color: #f0e6cc; line-height: 1.5; }
+
+#dealer-penalty-buttons { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+
+#dealer-accept-btn {
+  padding: 10px 20px;
+  background: linear-gradient(135deg, #1a6b20, #28a035);
+  color: white; border: none; border-radius: 8px;
+  font-size: 14px; font-weight: 700; cursor: pointer;
+  font-family: 'Inter', sans-serif;
+}
+
+/* ── PLAYER HAND ── */
 
 #player-hand {
   display: flex;
@@ -636,20 +575,7 @@ body {
   -webkit-overflow-scrolling: touch;
 }
 
-#game-screen {
-  width: 100vw;
-  min-height: 100vh;
-  min-height: -webkit-fill-available;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 8px;
-  gap: 6px;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-}
-
-/* ---- CARDS ---- */
+/* ── CARDS ── */
 
 .card {
   width: clamp(46px, 12vw, 68px);
@@ -664,30 +590,21 @@ body {
   font-size: clamp(14px, 4vw, 19px);
   font-weight: 700;
   cursor: pointer;
-  box-shadow:
-    0 2px 8px rgba(0,0,0,0.3),
-    0 0 0 1px rgba(0,0,0,0.05);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3), 0 0 0 1px rgba(0,0,0,0.05);
   transition: transform 0.12s, box-shadow 0.12s;
   user-select: none;
   flex-shrink: 0;
 }
 
-.card:hover {
-  transform: translateY(-10px);
-  box-shadow: 0 8px 20px rgba(0,0,0,0.4);
-}
-
+.card:hover { transform: translateY(-10px); box-shadow: 0 8px 20px rgba(0,0,0,0.4); }
 .card.red { color: #cc2200; }
-
 .card.selected {
   transform: translateY(-18px);
   border: 2px solid #f0c040;
-  box-shadow:
-    0 8px 20px rgba(0,0,0,0.4),
-    0 0 16px rgba(240,192,64,0.5);
+  box-shadow: 0 8px 20px rgba(0,0,0,0.4), 0 0 16px rgba(240,192,64,0.5);
 }
 
-/* ---- ACTION BAR ---- */
+/* ── ACTION BAR ── */
 
 #action-bar {
   display: flex;
@@ -716,88 +633,33 @@ body {
   color: white;
   box-shadow: 0 3px 10px rgba(200,50,0,0.3);
 }
-
-#draw-btn:hover { transform: translateY(-2px); box-shadow: 0 5px 14px rgba(200,50,0,0.4); }
+#draw-btn:hover { transform: translateY(-2px); }
 
 #play-btn {
   background: linear-gradient(135deg, #1a6b20, #28a035);
   color: white;
   box-shadow: 0 3px 10px rgba(40,160,50,0.3);
 }
-
-#play-btn:hover { transform: translateY(-2px); box-shadow: 0 5px 14px rgba(40,160,50,0.4); }
+#play-btn:hover { transform: translateY(-2px); }
 
 #last-card-btn {
   background: linear-gradient(135deg, #c8960c, #f0c040);
   color: #1a1a1a;
-  box-shadow: 0 3px 10px rgba(240,192,64,0.3);
   animation: pulse 1s infinite alternate;
 }
 
 #catch-btn {
   background: linear-gradient(135deg, #8b0000, #cc0000);
   color: white;
-  box-shadow: 0 3px 10px rgba(200,0,0,0.4);
   animation: pulse 0.5s infinite alternate;
 }
 
-/* ---- DEALER PENALTY PROMPT ---- */
-
-#dealer-penalty-prompt {
-  background: linear-gradient(160deg, #1a5c38 0%, #0f3d24 100%);
-  border: 1px solid rgba(240,192,64,0.3);
-  border-radius: 12px;
-  padding: 16px 20px;
-  text-align: center;
-  width: 100%;
-  max-width: 400px;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
-}
-
-#dealer-penalty-msg {
-  font-size: 14px;
-  margin-bottom: 12px;
-  color: #f0e6cc;
-  line-height: 1.5;
-}
-
-#dealer-penalty-buttons {
-  display: flex;
-  gap: 12px;
-  justify-content: center;
-}
-
-#dealer-accept-btn {
-  padding: 10px 20px;
-  background: linear-gradient(135deg, #1a6b20, #28a035);
-  color: white;
-  border: none;
-  border-radius: 8px;
-  font-size: 14px;
-  font-weight: 700;
-  cursor: pointer;
-  font-family: 'Inter', sans-serif;
-}
-
-#dealer-reject-btn {
-  padding: 10px 20px;
-  background: linear-gradient(135deg, #8b0000, #cc0000);
-  color: white;
-  border: none;
-  border-radius: 8px;
-  font-size: 14px;
-  font-weight: 700;
-  cursor: pointer;
-  font-family: 'Inter', sans-serif;
-}
-
-/* ---- ROUND OVER OVERLAY ---- */
+/* ── ROUND OVER ── */
 
 #round-over-overlay {
   position: fixed;
   top: 0; left: 0;
-  width: 100vw;
-  height: 100vh;
+  width: 100vw; height: 100vh;
   background: rgba(0,0,0,0.8);
   display: flex;
   align-items: center;
@@ -820,16 +682,13 @@ body {
   gap: 14px;
   width: 100%;
   max-width: 420px;
-  box-shadow:
-    0 0 0 1px rgba(0,0,0,0.4),
-    0 24px 64px rgba(0,0,0,0.6);
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.4), 0 24px 64px rgba(0,0,0,0.6);
 }
 
 #round-over-msg {
   font-family: 'Playfair Display', serif;
   font-size: clamp(22px, 5vw, 30px);
   color: #f0c040;
-  text-shadow: 0 2px 8px rgba(240,192,64,0.3);
 }
 
 .score-row {
@@ -840,27 +699,3 @@ body {
   border-radius: 8px;
   color: #f0e6cc;
 }
-
-#next-round-btn {
-  padding: 14px 32px;
-  background: linear-gradient(135deg, #c8960c 0%, #f0c040 50%, #c8960c 100%);
-  color: #1a1a1a;
-  border: none;
-  border-radius: 10px;
-  font-size: clamp(15px, 4vw, 18px);
-  font-weight: 700;
-  cursor: pointer;
-  margin-top: 8px;
-  font-family: 'Inter', sans-serif;
-  letter-spacing: 1px;
-  text-transform: uppercase;
-  box-shadow: 0 4px 16px rgba(240,192,64,0.3);
-  transition: all 0.2s;
-}
-
-#next-round-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(240,192,64,0.5);
-}
-
-.hidden { display: none !important; }

@@ -9,12 +9,12 @@
 </head>
 <body>
 
-  <!-- LOBBY SCREEN -->
+  <!-- LOBBY -->
   <div id="lobby-screen">
     <div class="dink-logo">DINK</div>
     <div class="suit-decoration">♠ ♥ ♦ ♣</div>
     <p class="dink-subtitle">An original card game</p>
-    <div class="panel" style="width:100%;display:flex;flex-direction:column;gap:12px;">
+    <div class="panel">
       <input type="text" id="name-input" placeholder="Enter your name" maxlength="20"/>
       <input type="text" id="room-input" placeholder="Enter a room code" maxlength="10"/>
       <button id="join-btn" class="gold-btn">Join / Create Room</button>
@@ -22,13 +22,13 @@
     <p id="lobby-error" class="error hidden"></p>
   </div>
 
-  <!-- WAITING ROOM SCREEN -->
+  <!-- WAITING ROOM -->
   <div id="waiting-screen" class="hidden">
-    <div class="dink-logo" style="font-size:clamp(36px,10vw,56px)">DINK</div>
+    <div class="dink-logo small-logo">DINK</div>
     <p id="waiting-room-code"></p>
     <p class="subtle">Share this room code with your friends!</p>
 
-    <!-- Stage 1: Players lineup -->
+    <!-- Stage 1 -->
     <div id="waiting-stage-1">
       <div id="waiting-players-list"></div>
       <button id="pick-dealer-btn" class="gold-btn hidden">🃏 Flip Cards for Dealer</button>
@@ -54,7 +54,7 @@
     </div>
   </div>
 
-  <!-- GAME SCREEN -->
+  <!-- GAME -->
   <div id="game-screen" class="hidden">
 
     <div id="top-bar">
@@ -70,7 +70,7 @@
     <div id="center-area">
       <div id="draw-pile">🂠<br/>Draw</div>
       <div id="discard-pile-wrapper">
-        <div id="discard-pile">Waiting...</div>
+        <div id="discard-pile">—</div>
         <div id="suit-indicator"></div>
       </div>
     </div>
@@ -78,6 +78,7 @@
     <div id="turn-banner"></div>
     <div id="game-log"></div>
 
+    <!-- Suit picker (for 8, 3, dealer flipped 8/3) -->
     <div id="suit-picker" class="hidden">
       <p>Choose a suit:</p>
       <div id="suit-buttons">
@@ -88,8 +89,7 @@
       </div>
     </div>
 
-    <div id="player-hand"></div>
-
+    <!-- Dealer penalty prompt (flipped A or 4) -->
     <div id="dealer-penalty-prompt" class="hidden">
       <p id="dealer-penalty-msg"></p>
       <div id="dealer-penalty-buttons">
@@ -98,21 +98,23 @@
       </div>
     </div>
 
+    <div id="player-hand"></div>
+
     <div id="action-bar">
-      <button id="draw-btn" class="hidden">Draw Card</button>
-      <button id="play-btn" class="hidden">Play Selected</button>
+      <button id="draw-btn"      class="hidden">Draw Card</button>
+      <button id="play-btn"      class="hidden">Play Selected</button>
       <button id="last-card-btn" class="hidden">🔔 Last Card!</button>
-      <button id="catch-btn" class="hidden">🫵 Catch!</button>
+      <button id="catch-btn"     class="hidden">🫵 Catch!</button>
     </div>
 
   </div>
 
-  <!-- ROUND OVER OVERLAY -->
+  <!-- ROUND OVER -->
   <div id="round-over-overlay" class="hidden">
     <div id="round-over-box">
       <h2 id="round-over-msg"></h2>
       <div id="round-scores-list"></div>
-      <button id="next-round-btn">Play Another Round</button>
+      <button id="next-round-btn" class="gold-btn">Play Another Round</button>
     </div>
   </div>
 
