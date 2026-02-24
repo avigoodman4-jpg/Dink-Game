@@ -131,6 +131,7 @@ function clearEffects(room) {
   room.pendingPickup = 0;
   room.flippedCardEffect = null;
   room.waitingForDealerSuit = false;
+  room.waitingForDealerPenalty = false;
 }
 
 // ─── BROADCAST ───────────────────────────────────────────────────────────────
@@ -169,12 +170,12 @@ function broadcast(room, roomCode, message) {
 // ─── VALIDITY ────────────────────────────────────────────────────────────────
 
 function isValidPlay(cards, room) {
-  // If waiting for dealer suit choice, nobody can play yet
   if (room.waitingForDealerSuit) return false;
+  if (room.waitingForDealerPenalty) return false;
 
   const { currentSuit, currentRank, pendingEffect } = room;
 
-  // Pending effects: only specific responses allowed
+  // Pending effects: ONLY specific responses allowed, nothing else
   if (pendingEffect === 'dink')
     return cards.every(c => c.rank === '2');
   if (pendingEffect === 'forceFive')
@@ -182,19 +183,15 @@ function isValidPlay(cards, room) {
   if (pendingEffect === 'equalRank')
     return cards.length >= 2 && cards.every(c => c.rank === cards[0].rank);
 
-  // All played cards must be same rank
+  // NO pending effect — completely normal play off top card
   if (!cards.every(c => c.rank === cards[0].rank)) return false;
 
   const rank = cards[0].rank;
   const suit = cards[0].suit;
 
-  // 8 is full wild — play on anything (but NOT while dink/forceFive/equalRank active — handled above)
   if (rank === '8') return true;
-
-  // 3 is half wild — only on matching suit or another 3
   if (rank === '3') return suit === currentSuit || currentRank === '3';
 
-  // Normal: match suit or rank
   return suit === currentSuit || rank === currentRank;
 }
 
@@ -609,32 +606,41 @@ io.on('connection', (socket) => {
     refillDraw(r);
 
     if (r.pendingPickup > 0) {
-      const drawn = r.drawPile.splice(0, r.pendingPickup);
+      const amount = r.pendingPickup;
+      // Clear effect BEFORE drawing
+      r.pendingEffect = null;
+      r.pendingPickup = 0;
+      r.flippedCardEffect = null;
+      refillDraw(r);
+      const drawn = r.drawPile.splice(0, amount);
       player.hand.push(...drawn);
+      const top = topCard(r);
+      r.currentSuit = top.suit;
+      r.currentRank = top.rank;
       const msg = `${player.name} picked up ${drawn.length} card${drawn.length > 1 ? 's' : ''}!`;
-      clearEffects(r);
       advanceTurn(r);
       broadcast(r, room, msg);
       return;
     }
 
-    if (r.pendingEffect === 'forceFive') {
+    if (r.pendingEffect === 'forceFive' || r.pendingEffect === 'equalRank') {
+      const effectMsg = r.pendingEffect === 'forceFive'
+        ? `${player.name} couldn't play a 5 — picked up one card!`
+        : `${player.name} couldn't match the rank — picked up one card!`;
+      // Clear effect BEFORE drawing so clearEffects doesn't re-read a special card rank
+      r.pendingEffect = null;
+      r.pendingPickup = 0;
+      r.flippedCardEffect = null;
+      refillDraw(r);
       const drawn = r.drawPile.splice(0, 1);
       player.hand.push(...drawn);
-      const msg = `${player.name} couldn't play a 5 — picked up one card!`;
-      clearEffects(r);
+      // Now reset suit/rank to top of discard (the 5 or 6 that caused this)
+      // but with pendingEffect already null so it won't block play
+      const top = topCard(r);
+      r.currentSuit = top.suit;
+      r.currentRank = top.rank;
       advanceTurn(r);
-      broadcast(r, room, msg);
-      return;
-    }
-
-    if (r.pendingEffect === 'equalRank') {
-      const drawn = r.drawPile.splice(0, 1);
-      player.hand.push(...drawn);
-      const msg = `${player.name} couldn't match the rank — picked up one card!`;
-      clearEffects(r);
-      advanceTurn(r);
-      broadcast(r, room, msg);
+      broadcast(r, room, effectMsg);
       return;
     }
 
