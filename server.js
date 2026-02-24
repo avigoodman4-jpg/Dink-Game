@@ -651,11 +651,14 @@ io.on('connection', (socket) => {
     const room = socket.roomCode;
     if (!room || !rooms[room]) return;
     const roomData = rooms[room];
-    roomData.currentSuit = suit;
     roomData.pendingEffect = null;
+    roomData.pendingPickup = 0;
+    roomData.flippedCardEffect = null;
+    advanceTurn(roomData);
+    // Set suit AFTER advancing turn so advanceTurn cannot overwrite it
+    roomData.currentSuit = suit;
     const player = roomData.players.find(p => p.id === socket.id);
     const msg = `${player.name} chose ${suit}!`;
-    advanceTurn(roomData);
     broadcastGameState(roomData, room, msg);
   });
 
