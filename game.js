@@ -140,7 +140,7 @@ function showDealerReveal(playerList, winnerIndex) {
 // ─── GAME STATE ───────────────────────────────────────────────────────────────
 
 function updateGameState(data) {
-  myHand = sortHand(data.hand);
+  myHand = data.hand;
   players = data.players;
   currentPlayerIndex = data.currentPlayerIndex;
   dealerIndex = data.dealerIndex;
@@ -193,13 +193,19 @@ function sortHand(hand) {
 function renderHand() {
   const handDiv = document.getElementById('player-hand');
   handDiv.innerHTML = '';
-  myHand.forEach((card, index) => {
+
+  // Sort a copy for display, keeping track of original indices
+  const sorted = myHand
+    .map((card, originalIndex) => ({ card, originalIndex }))
+    .sort((a, b) => RANK_ORDER.indexOf(a.card.rank) - RANK_ORDER.indexOf(b.card.rank));
+
+  sorted.forEach(({ card, originalIndex }) => {
     const div = document.createElement('div');
     div.classList.add('card');
     if (card.suit === 'hearts' || card.suit === 'diamonds') div.classList.add('red');
-    if (selectedCardIndices.includes(index)) div.classList.add('selected');
+    if (selectedCardIndices.includes(originalIndex)) div.classList.add('selected');
     div.innerHTML = `<span>${card.rank}</span><span>${SUIT_SYMBOLS[card.suit]}</span>`;
-    div.addEventListener('click', () => onCardClick(index));
+    div.addEventListener('click', () => onCardClick(originalIndex));
     handDiv.appendChild(div);
   });
 }
