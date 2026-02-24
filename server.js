@@ -447,8 +447,11 @@ io.on('connection', (socket) => {
     const player = r.players[playerIndex];
     const cards = cardIndices.map(i => player.hand[i]);
 
-    if (!isValidPlay(cards, r)) { socket.emit('invalidPlay', 'You cannot play those cards!'); return; }
-
+    if (!isValidPlay(cards, r)) {
+      socket.emit('invalidPlay', `Cannot play: suit=${r.currentSuit} rank=${r.currentRank} pending=${r.pendingEffect} pickup=${r.pendingPickup} waitSuit=${r.waitingForDealerSuit} waitPenalty=${r.waitingForDealerPenalty} | tried: ${cards.map(c=>c.rank+c.suit).join(',')}`);
+      return;
+    }
+    
     // Remove played cards from hand
     player.hand = player.hand.filter((_, i) => !cardIndices.includes(i));
     cards.forEach(c => r.discardPile.push(c));
