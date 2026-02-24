@@ -63,6 +63,7 @@ function dealHand(room) {
   room.flippedAceCount = 0;
   room.waitingForDealerSuit = false;
   room.waitingForDealerPenalty = false;
+  room.waitingForSuitChoice = false;
 
   // Flip top card
   const top = deck.splice(0, 1)[0];
@@ -295,7 +296,8 @@ io.on('connection', (socket) => {
         flippedCardEffect: null,
         flippedAceCount: 0,
         waitingForDealerSuit: false,
-        waitingForDealerPenalty: false
+        waitingForDealerPenalty: false,
+        waitingForSuitChoice: false
       };
     }
 
