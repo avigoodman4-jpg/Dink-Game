@@ -57,6 +57,7 @@ function dealHand(room) {
   room.currentSuit = null;
   room.currentRank = null;
   room.skippedPlayers = new Set();
+  room.aceSkipPlayers = new Set();
   room.direction = 1;
   room.lastCardDeclared = false;
   room.flippedCardEffect = null;
@@ -64,6 +65,7 @@ function dealHand(room) {
   room.waitingForDealerSuit = false;
   room.waitingForDealerPenalty = false;
   room.waitingForSuitChoice = false;
+  room.handOver = false;
 
   // Flip top card
   const top = deck.splice(0, 1)[0];
@@ -122,9 +124,20 @@ function nextIndex(room, from, steps = 1) {
 
 function advanceTurn(room) {
   let idx = nextIndex(room, room.currentPlayerIndex);
+  // Handle jack/flipped-jack skips (direction-aware)
   while (room.skippedPlayers.has(idx)) {
     room.skippedPlayers.delete(idx);
     idx = nextIndex(room, idx);
+  }
+  // Handle ace skips (applied at destination, not direction-dependent)
+  if (room.aceSkipPlayers.has(idx)) {
+    room.aceSkipPlayers.delete(idx);
+    idx = nextIndex(room, idx);
+    // Also consume any jack skips at new position
+    while (room.skippedPlayers.has(idx)) {
+      room.skippedPlayers.delete(idx);
+      idx = nextIndex(room, idx);
+    }
   }
   room.currentPlayerIndex = idx;
 }
@@ -298,12 +311,14 @@ io.on('connection', (socket) => {
         currentSuit: null, currentRank: null,
         pendingPickup: 0, pendingEffect: null,
         skippedPlayers: new Set(),
+        aceSkipPlayers: new Set(),
         lastCardDeclared: false,
         flippedCardEffect: null,
         flippedAceCount: 0,
         waitingForDealerSuit: false,
         waitingForDealerPenalty: false,
-        waitingForSuitChoice: false
+        waitingForSuitChoice: false,
+        handOver: false
       };
     }
 
@@ -423,7 +438,7 @@ io.on('connection', (socket) => {
 
     if (accept) {
       if (r.flippedCardEffect === 'ace') {
-        r.skippedPlayers.add(r.dealerIndex);
+        r.aceSkipPlayers.add(r.dealerIndex);
         r.flippedCardEffect = null;
         r.waitingForDealerPenalty = false;
         broadcast(r, room, `${dealer.name} accepted the Ace penalty — loses first turn!`);
@@ -462,6 +477,7 @@ io.on('connection', (socket) => {
 
     if (r.waitingForDealerSuit) { socket.emit('invalidPlay', 'Waiting for dealer to call a suit!'); return; }
     if (r.waitingForDealerPenalty) { socket.emit('invalidPlay', 'Waiting for dealer to resolve the flipped card!'); return; }
+    if (r.handOver) return;
 
     const playerIndex = r.players.findIndex(p => p.id === socket.id);
     if (playerIndex !== r.currentPlayerIndex) { socket.emit('invalidPlay', 'It is not your turn!'); return; }
@@ -528,7 +544,7 @@ io.on('connection', (socket) => {
 
     else if (rank === '6') {
       r.pendingEffect = 'equalRank';
-      message = `${player.name} played a 6! Next player must play 2+ of the same rank!`;
+      message = `${player.name} played a 6! Next player must play 2+ of the same rank matching the suit or rank of the 6!`;
     }
 
     else if (rank === '8') {
@@ -576,7 +592,7 @@ io.on('connection', (socket) => {
 
     else if (rank === 'A') {
       if (count % 2 !== 0) {
-        r.skippedPlayers.add(playerIndex);
+        r.aceSkipPlayers.add(playerIndex);
         message = `${player.name} played ${count} Ace${count > 1 ? 's' : ''} — loses next turn!`;
       } else {
         message = `${player.name} played ${count} Ace${count > 1 ? 's' : ''} — even number, no effect!`;
@@ -587,6 +603,7 @@ io.on('connection', (socket) => {
 
     if (player.hand.length === 0) {
       player.handsWon++;
+      r.handOver = true;
       message = `🎉 ${player.name} won hand ${r.currentHand}!`;
       broadcast(r, room, message);
       setTimeout(() => startNextHand(r, room), 2000);
@@ -612,7 +629,7 @@ io.on('connection', (socket) => {
     if (!room || !rooms[room]) return;
     const r = rooms[room];
 
-    if (r.waitingForDealerSuit || r.waitingForDealerPenalty || r.waitingForSuitChoice) return;
+    if (r.waitingForDealerSuit || r.waitingForDealerPenalty || r.waitingForSuitChoice || r.handOver) return;
 
     const playerIndex = r.players.findIndex(p => p.id === socket.id);
     if (playerIndex !== r.currentPlayerIndex) return;
