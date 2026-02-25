@@ -550,6 +550,13 @@ io.on('connection', (socket) => {
     else if (rank === '8') {
       r.waitingForSuitChoice = true;
       message = `${player.name} played a wild 8! Choosing suit...`;
+      if (player.hand.length === 0) {
+        player.handsWon++;
+        r.handOver = true;
+        broadcast(r, room, `🎉 ${player.name} won hand ${r.currentHand}!`);
+        setTimeout(() => startNextHand(r, room), 2000);
+        return;
+      }
       broadcast(r, room, message);
       socket.emit('chooseSuit');
       return;
