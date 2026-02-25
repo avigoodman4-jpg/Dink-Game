@@ -179,8 +179,14 @@ function isValidPlay(cards, room) {
     return cards.every(c => c.rank === '2');
   if (pendingEffect === 'forceFive')
     return cards.every(c => c.rank === '5');
-  if (pendingEffect === 'equalRank')
-    return cards.length >= 2 && cards.every(c => c.rank === cards[0].rank);
+  if (pendingEffect === 'equalRank') {
+    if (cards.length < 2) return false;
+    if (!cards.every(c => c.rank === cards[0].rank)) return false;
+    // 2+ eights are always valid (wild)
+    if (cards[0].rank === '8') return true;
+    // Otherwise at least one card must match the suit or rank of the 6
+    return cards.some(c => c.suit === currentSuit || c.rank === currentRank);
+  }
 
   if (!cards.every(c => c.rank === cards[0].rank)) return false;
 
