@@ -161,7 +161,7 @@ function updateGameState(data) {
 
   // Hide dealer panels by default
   document.getElementById('dealer-penalty-prompt').classList.add('hidden');
-  document.getElementById('dealer-suit-prompt').classList.add('hidden');
+  document.getElementById('suit-picker').classList.add('hidden');
 
   // Show dealer suit prompt if waiting
   if (data.waitingForDealerSuit) {
