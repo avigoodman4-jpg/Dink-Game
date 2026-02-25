@@ -66,6 +66,7 @@ function dealHand(room) {
   room.waitingForDealerPenalty = false;
   room.waitingForSuitChoice = false;
   room.handOver = false;
+  room.pendingAceSelfSkip = null;
 
   // Flip top card
   const top = deck.splice(0, 1)[0];
@@ -140,6 +141,11 @@ function advanceTurn(room) {
     }
   }
   room.currentPlayerIndex = idx;
+  // After landing, register any pending self-skip for next time this player's turn comes
+  if (room.pendingAceSelfSkip !== null && room.pendingAceSelfSkip !== undefined) {
+    room.aceSkipPlayers.add(room.pendingAceSelfSkip);
+    room.pendingAceSelfSkip = null;
+  }
 }
 
 function topCard(room) {
@@ -318,7 +324,8 @@ io.on('connection', (socket) => {
         waitingForDealerSuit: false,
         waitingForDealerPenalty: false,
         waitingForSuitChoice: false,
-        handOver: false
+        handOver: false,
+        pendingAceSelfSkip: null
       };
     }
 
@@ -438,7 +445,7 @@ io.on('connection', (socket) => {
 
     if (accept) {
       if (r.flippedCardEffect === 'ace') {
-        r.aceSkipPlayers.add(r.dealerIndex);
+        r.pendingAceSelfSkip = r.dealerIndex;
         r.flippedCardEffect = null;
         r.waitingForDealerPenalty = false;
         broadcast(r, room, `${dealer.name} accepted the Ace penalty — loses first turn!`);
@@ -599,7 +606,9 @@ io.on('connection', (socket) => {
 
     else if (rank === 'A') {
       if (count % 2 !== 0) {
-        r.aceSkipPlayers.add(playerIndex);
+        // Skip the player who just played on their next turn
+        // by adding them to aceSkipPlayers AFTER advanceTurn runs
+        r.pendingAceSelfSkip = playerIndex;
         message = `${player.name} played ${count} Ace${count > 1 ? 's' : ''} — loses next turn!`;
       } else {
         message = `${player.name} played ${count} Ace${count > 1 ? 's' : ''} — even number, no effect!`;
