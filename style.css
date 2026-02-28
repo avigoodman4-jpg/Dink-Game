@@ -451,14 +451,14 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  font-size: clamp(16px, 5vw, 24px);
+  font-size: clamp(18px, 5.5vw, 26px);
   font-weight: 700;
   box-shadow: 0 4px 16px rgba(0,0,0,0.4), 0 0 0 3px rgba(240,192,64,0.3);
   gap: 4px;
 }
 
 #suit-indicator {
-  font-size: clamp(13px, 3.5vw, 16px);
+  font-size: clamp(15px, 4vw, 18px);
   font-weight: 700;
   text-align: center;
   min-height: 22px;
@@ -524,7 +524,7 @@ body {
   padding: 10px 16px;
   border-radius: 8px;
   border: 1px solid rgba(0,0,0,0.1);
-  font-size: clamp(14px, 4vw, 18px);
+  font-size: clamp(16px, 4.5vw, 20px);
   font-weight: 700;
   cursor: pointer;
   background: white;
@@ -587,7 +587,7 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  font-size: clamp(14px, 4vw, 19px);
+  font-size: clamp(16px, 4.5vw, 22px);
   font-weight: 700;
   cursor: pointer;
   box-shadow: 0 2px 8px rgba(0,0,0,0.3), 0 0 0 1px rgba(0,0,0,0.05);
@@ -613,6 +613,7 @@ body {
   justify-content: center;
   padding: 0 8px;
   width: 100%;
+  align-items: center;
 }
 
 #action-bar button {
@@ -646,12 +647,122 @@ body {
   background: linear-gradient(135deg, #c8960c, #f0c040);
   color: #1a1a1a;
   animation: pulse 1s infinite alternate;
+  padding: 10px 18px;
+  border-radius: 9px;
+  border: none;
+  font-size: clamp(12px, 3.5vw, 15px);
+  font-weight: 700;
+  cursor: pointer;
+  font-family: 'Inter', sans-serif;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+/* ── CATCH SECTION ── */
+
+#catch-section {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+#catch-select {
+  padding: 10px 12px;
+  border-radius: 9px;
+  background: rgba(0,0,0,0.4);
+  color: #f0e6cc;
+  font-size: clamp(11px, 3vw, 13px);
+  font-family: 'Inter', sans-serif;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid rgba(240,192,64,0.3);
 }
 
 #catch-btn {
+  padding: 10px 14px;
+  border-radius: 9px;
+  border: none;
+  font-size: clamp(12px, 3.5vw, 15px);
+  font-weight: 700;
+  cursor: pointer;
+  font-family: 'Inter', sans-serif;
   background: linear-gradient(135deg, #8b0000, #cc0000);
   color: white;
-  animation: pulse 0.5s infinite alternate;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  transition: all 0.15s;
+}
+#catch-btn:hover { transform: translateY(-2px); }
+
+/* ── HAND WON OVERLAY ── */
+
+#hand-won-overlay {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100vw; height: 100vh;
+  background: rgba(0,0,0,0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+  padding: 20px;
+  backdrop-filter: blur(4px);
+}
+
+#hand-won-overlay.hidden { display: none !important; }
+
+#confetti-canvas {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  pointer-events: none;
+}
+
+#hand-won-box {
+  background: linear-gradient(160deg, #1a5c38 0%, #0f3d24 100%);
+  border: 2px solid rgba(240,192,64,0.5);
+  border-radius: 20px;
+  padding: clamp(28px, 6vw, 48px);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+  max-width: 440px;
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.4), 0 24px 64px rgba(0,0,0,0.7);
+  position: relative;
+  z-index: 1;
+}
+
+#hand-won-trophy {
+  font-size: clamp(48px, 12vw, 72px);
+  animation: pulse 0.8s infinite alternate;
+}
+
+#hand-won-msg {
+  font-family: 'Playfair Display', serif;
+  font-size: clamp(18px, 4.5vw, 26px);
+  color: #f0c040;
+  line-height: 1.3;
+}
+
+#hand-won-detail {
+  font-size: 13px;
+  opacity: 0.6;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+#hand-won-scores {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+#hand-won-countdown {
+  font-size: 13px;
+  opacity: 0.5;
+  letter-spacing: 1px;
 }
 
 /* ── ROUND OVER ── */

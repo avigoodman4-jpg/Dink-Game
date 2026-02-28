@@ -101,12 +101,29 @@
     <div id="player-hand"></div>
 
     <div id="action-bar">
-      <button id="draw-btn"      class="hidden">Draw Card</button>
-      <button id="play-btn"      class="hidden">Play Selected</button>
-      <button id="last-card-btn" class="hidden">🔔 Last Card!</button>
-      <button id="catch-btn"     class="hidden">🫵 Catch!</button>
+      <button id="draw-btn" class="hidden">Draw Card</button>
+      <button id="play-btn" class="hidden">Play Selected</button>
+      <button id="last-card-btn">🔔 Last Card!</button>
+      <div id="catch-section">
+        <select id="catch-select">
+          <option value="">🫵 Catch player...</option>
+        </select>
+        <button id="catch-btn">Catch!</button>
+      </div>
     </div>
 
+  </div>
+
+  <!-- HAND WON -->
+  <div id="hand-won-overlay" class="hidden">
+    <canvas id="confetti-canvas"></canvas>
+    <div id="hand-won-box">
+      <div id="hand-won-trophy">🏆</div>
+      <h2 id="hand-won-msg"></h2>
+      <p id="hand-won-detail"></p>
+      <div id="hand-won-scores"></div>
+      <p id="hand-won-countdown">Next hand starting in <span id="countdown-num">6</span>s...</p>
+    </div>
   </div>
 
   <!-- ROUND OVER -->

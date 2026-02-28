@@ -201,9 +201,7 @@ function isValidPlay(cards, room) {
   if (pendingEffect === 'equalRank') {
     if (cards.length < 2) return false;
     if (!cards.every(c => c.rank === cards[0].rank)) return false;
-    // 2+ eights are always valid (wild)
     if (cards[0].rank === '8') return true;
-    // Otherwise at least one card must match the suit or rank of the 6
     return cards.some(c => c.suit === currentSuit || c.rank === currentRank);
   }
 
@@ -265,17 +263,24 @@ function emitHandStart(room, roomCode, eventName) {
     });
   });
 
-  // Ask dealer to pick suit if 8 or 3 flipped
   if (room.waitingForDealerSuit) {
     const ds = io.sockets.sockets.get(room.players[room.dealerIndex].id);
     if (ds) ds.emit('chooseSuit');
   }
 
-  // Ask dealer to accept/reject if A or 4 flipped
   if (room.waitingForDealerPenalty) {
     const ds = io.sockets.sockets.get(room.players[room.dealerIndex].id);
     if (ds) ds.emit('dealerPenaltyPrompt', { effect: room.flippedCardEffect });
   }
+}
+
+function emitHandWon(room, roomCode, winnerName, winMessage) {
+  io.to(roomCode).emit('handWon', {
+    winnerName,
+    handNumber: room.currentHand,
+    winMessage,
+    players: room.players.map(p => ({ name: p.name, handsWon: p.handsWon, score: p.score }))
+  });
 }
 
 function startNextHand(roomData, roomCode) {
@@ -405,14 +410,13 @@ io.on('connection', (socket) => {
     emitHandStart(r, room, 'gameStarted');
   });
 
-  // ── SUIT CHOSEN (flipped 8/3 or played 8/3) ──
+  // ── SUIT CHOSEN ──
 
   socket.on('suitChosen', ({ suit }) => {
     const room = socket.roomCode;
     if (!room || !rooms[room]) return;
     const r = rooms[room];
 
-    // Waiting for dealer suit (flipped 8 or 3)
     if (r.waitingForDealerSuit) {
       const dealer = r.players[r.dealerIndex];
       if (!dealer || dealer.id !== socket.id) return;
@@ -423,7 +427,6 @@ io.on('connection', (socket) => {
       return;
     }
 
-    // Normal suit choice after playing 8 or 3
     const player = r.players.find(p => p.id === socket.id);
     if (!player) return;
     r.pendingEffect = null;
@@ -434,7 +437,7 @@ io.on('connection', (socket) => {
     broadcast(r, room, `${player.name} chose ${suit}!`);
   });
 
-  // ── DEALER PENALTY CHOICE (flipped A or 4) ──
+  // ── DEALER PENALTY CHOICE ──
 
   socket.on('dealerPenaltyChoice', ({ accept, cardIndex }) => {
     const room = socket.roomCode;
@@ -458,7 +461,6 @@ io.on('connection', (socket) => {
         broadcast(r, room, `${dealer.name} accepted the 4 penalty — picked up one card!`);
       }
     } else {
-      // Reject — play a matching card immediately
       const card = dealer.hand[cardIndex];
       if (!card) { socket.emit('invalidPlay', 'No card to reject with!'); return; }
       if (r.flippedCardEffect === 'ace' && card.rank !== 'A') { socket.emit('invalidPlay', 'You can only reject with an Ace!'); return; }
@@ -493,21 +495,18 @@ io.on('connection', (socket) => {
     const cards = cardIndices.map(i => player.hand[i]);
 
     if (!isValidPlay(cards, r)) {
-      socket.emit('invalidPlay', `Cannot play: suit=${r.currentSuit} rank=${r.currentRank} pending=${r.pendingEffect} pickup=${r.pendingPickup} waitSuit=${r.waitingForDealerSuit} waitPenalty=${r.waitingForDealerPenalty} | tried: ${cards.map(c => c.rank + c.suit).join(',')}`);
+      socket.emit('invalidPlay', `Cannot play: suit=${r.currentSuit} rank=${r.currentRank} pending=${r.pendingEffect} pickup=${r.pendingPickup} | tried: ${cards.map(c => c.rank + c.suit).join(',')}`);
       return;
     }
 
-    // Remove played cards from hand
     player.hand = player.hand.filter((_, i) => !cardIndices.includes(i));
     cards.forEach(c => r.discardPile.push(c));
 
-    // Last card played determines suit and rank
     const last = cards[cards.length - 1];
     const rank = last.rank;
     const suit = last.suit;
     const count = cards.length;
 
-    // Reset pending state
     r.pendingEffect = null;
     if (rank !== '2') r.pendingPickup = 0;
     r.currentRank = rank;
@@ -527,6 +526,13 @@ io.on('connection', (socket) => {
 
     else if (rank === '3') {
       r.waitingForSuitChoice = true;
+      if (player.hand.length === 0) {
+        player.handsWon++;
+        r.handOver = true;
+        emitHandWon(r, room, player.name, `🎉 ${player.name} won hand ${r.currentHand}! Played a 3!`);
+        setTimeout(() => startNextHand(r, room), 6000);
+        return;
+      }
       message = `${player.name} played a 3! Choosing suit...`;
       broadcast(r, room, message);
       socket.emit('chooseSuit');
@@ -556,14 +562,14 @@ io.on('connection', (socket) => {
 
     else if (rank === '8') {
       r.waitingForSuitChoice = true;
-      message = `${player.name} played a wild 8! Choosing suit...`;
       if (player.hand.length === 0) {
         player.handsWon++;
         r.handOver = true;
-        broadcast(r, room, `🎉 ${player.name} won hand ${r.currentHand}!`);
-        setTimeout(() => startNextHand(r, room), 2000);
+        emitHandWon(r, room, player.name, `🎉 ${player.name} won hand ${r.currentHand}! Played a wild 8!`);
+        setTimeout(() => startNextHand(r, room), 6000);
         return;
       }
+      message = `${player.name} played a wild 8! Choosing suit...`;
       broadcast(r, room, message);
       socket.emit('chooseSuit');
       return;
@@ -606,8 +612,6 @@ io.on('connection', (socket) => {
 
     else if (rank === 'A') {
       if (count % 2 !== 0) {
-        // Skip the player who just played on their next turn
-        // by adding them to aceSkipPlayers AFTER advanceTurn runs
         r.pendingAceSelfSkip = playerIndex;
         message = `${player.name} played ${count} Ace${count > 1 ? 's' : ''} — loses next turn!`;
       } else {
@@ -620,9 +624,9 @@ io.on('connection', (socket) => {
     if (player.hand.length === 0) {
       player.handsWon++;
       r.handOver = true;
-      message = `🎉 ${player.name} won hand ${r.currentHand}!`;
-      broadcast(r, room, message);
-      setTimeout(() => startNextHand(r, room), 2000);
+      const winMsg = `🎉 ${player.name} won hand ${r.currentHand}! ${count > 1 ? count + 'x ' : ''}${rank} played!`;
+      emitHandWon(r, room, player.name, winMsg);
+      setTimeout(() => startNextHand(r, room), 6000);
       return;
     }
 
@@ -653,7 +657,6 @@ io.on('connection', (socket) => {
 
     refillDraw(r);
 
-    // Determine how many cards to draw and message
     let drawCount = 1;
     let msg = `${player.name} picked up one card.`;
 
@@ -666,13 +669,10 @@ io.on('connection', (socket) => {
       msg = `${player.name} couldn't match the rank — picked up one card!`;
     }
 
-    // Draw the cards
     const drawn = r.drawPile.splice(0, drawCount);
     player.hand.push(...drawn);
     sortHand(player.hand);
 
-    // ALWAYS wipe ALL effects after any draw — no exceptions
-    // Wipe ALL effects after any draw — no exceptions
     r.pendingEffect = null;
     r.pendingPickup = 0;
     r.flippedCardEffect = null;
@@ -680,17 +680,11 @@ io.on('connection', (socket) => {
     r.waitingForDealerPenalty = false;
     r.waitingForSuitChoice = false;
 
-    // Reset rank to top card but preserve currentSuit
-    // because a played 8 or 3 may have changed it to a chosen suit
-    // that must survive through other players drawing
     const top = topCard(r);
     r.currentRank = top.rank;
-    // Only reset suit if no explicit suit was chosen — i.e. top card suit matches currentSuit
-    // If they differ, currentSuit was deliberately set by a suit choice and must be kept
     if (r.currentSuit === top.suit) {
-      r.currentSuit = top.suit; // no-op but explicit
+      r.currentSuit = top.suit;
     }
-    // else: keep r.currentSuit as-is (it was set by 8 or 3 choice)
 
     advanceTurn(r);
     broadcast(r, room, msg);
@@ -714,6 +708,14 @@ io.on('connection', (socket) => {
     const r = rooms[room];
     const caught = r.players.find(p => p.name === caughtPlayerName);
     if (!caught) return;
+    if (caught.hand.length !== 1) {
+      socket.emit('catchFailed', `${caughtPlayerName} doesn't have exactly one card!`);
+      return;
+    }
+    if (r.lastCardDeclared) {
+      socket.emit('catchFailed', `${caughtPlayerName} already called Last Card — can't catch them!`);
+      return;
+    }
     refillDraw(r);
     caught.hand.push(...r.drawPile.splice(0, 1));
     sortHand(caught.hand);

@@ -159,11 +159,9 @@ function updateGameState(data) {
 
   if (data.message) logMessage(data.message);
 
-  // Hide dealer panels by default
   document.getElementById('dealer-penalty-prompt').classList.add('hidden');
   document.getElementById('suit-picker').classList.add('hidden');
 
-  // Show dealer suit prompt if waiting
   if (data.waitingForDealerSuit) {
     const isDealer = players[dealerIndex] && players[dealerIndex].name === myName;
     if (!isDealer) {
@@ -172,7 +170,6 @@ function updateGameState(data) {
     }
   }
 
-  // Show dealer penalty prompt
   if (data.flippedCardEffect === 'ace' || data.flippedCardEffect === 'four') {
     const isDealer = players[dealerIndex] && players[dealerIndex].name === myName;
     if (isDealer) {
@@ -194,7 +191,7 @@ function renderHand() {
     div.classList.add('card');
     if (card.suit === 'hearts' || card.suit === 'diamonds') div.classList.add('red');
     if (selectedCardIndices.includes(index)) div.classList.add('selected');
-    div.innerHTML = `<span>${card.rank}</span><span>${SUIT_SYMBOLS[card.suit]}</span>`;
+    div.innerHTML = `<span>${card.rank}</span><span style="font-size:1.3em">${SUIT_SYMBOLS[card.suit]}</span>`;
     div.addEventListener('click', () => onCardClick(index));
     handDiv.appendChild(div);
   });
@@ -203,7 +200,7 @@ function renderHand() {
 function renderDiscardPile(top, currentSuit) {
   const el = document.getElementById('discard-pile');
   const isRed = top.suit === 'hearts' || top.suit === 'diamonds';
-  el.innerHTML = `<span>${top.rank}</span><span>${SUIT_SYMBOLS[top.suit]}</span>`;
+  el.innerHTML = `<span>${top.rank}</span><span style="font-size:1.3em">${SUIT_SYMBOLS[top.suit]}</span>`;
   el.style.color = isRed ? '#cc2200' : '#111';
 
   const suitEl = document.getElementById('suit-indicator');
@@ -223,7 +220,6 @@ function renderPlayers(playerList, dir) {
   const cx = 160, cy = 160, radius = 120;
   const myIndex = playerList.findIndex(p => p.name === myName);
 
-  // SVG for circle and arrow
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   svg.setAttribute('width', '320');
   svg.setAttribute('height', '320');
@@ -236,7 +232,6 @@ function renderPlayers(playerList, dir) {
   circle.setAttribute('stroke-width', '2');
   svg.appendChild(circle);
 
-  // Direction arrow
   const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
   const marker = document.createElementNS('http://www.w3.org/2000/svg', 'marker');
   marker.setAttribute('id', 'arr'); marker.setAttribute('markerWidth', '6'); marker.setAttribute('markerHeight', '6');
@@ -255,7 +250,6 @@ function renderPlayers(playerList, dir) {
   svg.appendChild(arc);
   container.appendChild(svg);
 
-  // Player tokens
   playerList.forEach((p, i) => {
     const offset = myIndex >= 0 ? i - myIndex : i;
     const angle = (offset / total) * 360 - 90;
@@ -282,6 +276,17 @@ function renderPlayers(playerList, dir) {
     `;
     container.appendChild(div);
   });
+
+  // Update catch dropdown
+  const catchSelect = document.getElementById('catch-select');
+  catchSelect.innerHTML = '<option value="">🫵 Catch player...</option>';
+  playerList.forEach(p => {
+    if (p.name === myName) return;
+    const opt = document.createElement('option');
+    opt.value = p.name;
+    opt.textContent = `${p.name} (${p.cardCount} cards)`;
+    catchSelect.appendChild(opt);
+  });
 }
 
 // ─── TURN ─────────────────────────────────────────────────────────────────────
@@ -294,9 +299,7 @@ function updateTurnDisplay(data) {
   const banner = document.getElementById('turn-banner');
   const drawBtn = document.getElementById('draw-btn');
   const playBtn = document.getElementById('play-btn');
-  const lastCardBtn = document.getElementById('last-card-btn');
 
-  // Don't show action buttons if waiting for dealer
   const blocked = data.waitingForDealerSuit || data.flippedCardEffect === 'ace' || data.flippedCardEffect === 'four';
 
   if (isMyTurn() && !blocked) {
@@ -308,7 +311,6 @@ function updateTurnDisplay(data) {
     banner.classList.add('my-turn');
     banner.classList.remove('other-turn');
     drawBtn.classList.remove('hidden');
-    lastCardBtn.classList.toggle('hidden', myHand.length !== 2);
   } else {
     const cp = players[currentPlayerIndex];
     banner.textContent = blocked ? '⏳ Waiting for dealer...' : (cp ? `⏳ ${cp.name}'s turn...` : '');
@@ -316,7 +318,6 @@ function updateTurnDisplay(data) {
     banner.classList.remove('my-turn');
     drawBtn.classList.add('hidden');
     playBtn.classList.add('hidden');
-    lastCardBtn.classList.add('hidden');
   }
 }
 
@@ -344,7 +345,6 @@ function logMessage(msg) {
 function showSuitPicker(eventName) {
   const picker = document.getElementById('suit-picker');
   picker.classList.remove('hidden');
-  // Store which event to emit when suit is chosen
   picker.dataset.eventName = eventName || 'suitChosen';
 }
 
@@ -411,24 +411,71 @@ document.getElementById('play-btn').addEventListener('click', () => {
 });
 
 document.getElementById('last-card-btn').addEventListener('click', () => {
-  if (!isMyTurn()) return;
   lastCardDeclared = true;
   socket.emit('declareLastCard');
-  document.getElementById('last-card-btn').classList.add('hidden');
-  logMessage('You declared Last Card! Now play your card.');
+  logMessage('🔔 You declared Last Card! Now play your card.');
 });
 
 document.getElementById('catch-btn').addEventListener('click', () => {
-  const btn = document.getElementById('catch-btn');
-  if (btn.dataset.target) {
-    socket.emit('catchLastCard', { caughtPlayerName: btn.dataset.target });
-    btn.classList.add('hidden');
-  }
+  const select = document.getElementById('catch-select');
+  const target = select.value;
+  if (!target) { logMessage('❌ Select a player to catch first!'); return; }
+  socket.emit('catchLastCard', { caughtPlayerName: target });
+  select.value = '';
 });
 
 document.getElementById('next-round-btn').addEventListener('click', () => {
   if (isHost) socket.emit('nextRound');
 });
+
+// ─── CONFETTI ────────────────────────────────────────────────────────────────
+
+let confettiAnimFrame = null;
+let confettiParticles = [];
+
+function startConfetti() {
+  const canvas = document.getElementById('confetti-canvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  confettiParticles = Array.from({ length: 120 }, () => ({
+    x: Math.random() * canvas.width,
+    y: Math.random() * -canvas.height,
+    r: Math.random() * 8 + 4,
+    d: Math.random() * 120 + 20,
+    color: ['#f0c040','#fde98a','#ff6644','#28a035','#4488ff','#cc2200'][Math.floor(Math.random()*6)],
+    tilt: Math.random() * 10 - 10,
+    tiltAngle: 0,
+    tiltSpeed: Math.random() * 0.1 + 0.05
+  }));
+  function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    confettiParticles.forEach(p => {
+      p.tiltAngle += p.tiltSpeed;
+      p.y += (Math.cos(p.d) + 2 + p.r / 10);
+      p.x += Math.sin(p.tiltAngle) * 1.5;
+      p.tilt = Math.sin(p.tiltAngle) * 12;
+      if (p.y > canvas.height) { p.y = -10; p.x = Math.random() * canvas.width; }
+      ctx.beginPath();
+      ctx.lineWidth = p.r;
+      ctx.strokeStyle = p.color;
+      ctx.moveTo(p.x + p.tilt + p.r / 4, p.y);
+      ctx.lineTo(p.x + p.tilt, p.y + p.tilt + p.r / 4);
+      ctx.stroke();
+    });
+    confettiAnimFrame = requestAnimationFrame(draw);
+  }
+  if (confettiAnimFrame) cancelAnimationFrame(confettiAnimFrame);
+  draw();
+}
+
+function stopConfetti() {
+  if (confettiAnimFrame) cancelAnimationFrame(confettiAnimFrame);
+  confettiAnimFrame = null;
+  const canvas = document.getElementById('confetti-canvas');
+  if (canvas) canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
+}
 
 // ─── SOCKET EVENTS ───────────────────────────────────────────────────────────
 
@@ -469,12 +516,40 @@ socket.on('gameStarted', (data) => {
 
 socket.on('gameState', (data) => updateGameState(data));
 
+socket.on('handWon', ({ winnerName, handNumber, winMessage, players: pl }) => {
+  const overlay = document.getElementById('hand-won-overlay');
+  document.getElementById('hand-won-msg').textContent = winMessage;
+  document.getElementById('hand-won-detail').textContent = `Hand ${handNumber} of 7 complete`;
+  const scoresDiv = document.getElementById('hand-won-scores');
+  scoresDiv.innerHTML = '';
+  pl.forEach(p => {
+    const div = document.createElement('div');
+    div.classList.add('score-row');
+    div.textContent = `${p.name}: ${p.handsWon} hand${p.handsWon !== 1 ? 's' : ''} won`;
+    scoresDiv.appendChild(div);
+  });
+  overlay.classList.remove('hidden');
+  startConfetti();
+  let secs = 6;
+  document.getElementById('countdown-num').textContent = secs;
+  const interval = setInterval(() => {
+    secs--;
+    const el = document.getElementById('countdown-num');
+    if (el) el.textContent = secs;
+    if (secs <= 0) clearInterval(interval);
+  }, 1000);
+});
+
 socket.on('nextHand', (data) => {
   document.getElementById('round-over-overlay').classList.add('hidden');
+  document.getElementById('hand-won-overlay').classList.add('hidden');
+  stopConfetti();
   updateGameState(data);
 });
 
 socket.on('roundOver', ({ players: pl, winner, message }) => {
+  stopConfetti();
+  document.getElementById('hand-won-overlay').classList.add('hidden');
   const overlay = document.getElementById('round-over-overlay');
   const scoresList = document.getElementById('round-scores-list');
   const nextBtn = document.getElementById('next-round-btn');
@@ -514,16 +589,15 @@ socket.on('dealerPenaltyPrompt', ({ effect }) => {
 
 socket.on('invalidPlay', (msg) => logMessage(`❌ ${msg}`));
 
+socket.on('catchFailed', (msg) => logMessage(`❌ ${msg}`));
+
 socket.on('catchable', ({ playerName }) => {
-  if (playerName === myName) return;
-  const btn = document.getElementById('catch-btn');
-  btn.dataset.target = playerName;
-  btn.classList.remove('hidden');
-  setTimeout(() => btn.classList.add('hidden'), 3000);
+  if (playerName !== myName) {
+    logMessage(`🔔 ${playerName} is on their last card — catch them if they didn't call it!`);
+  }
 });
 
 socket.on('caughtLastCard', ({ msg }) => {
-  document.getElementById('catch-btn').classList.add('hidden');
   logMessage(msg);
 });
 
